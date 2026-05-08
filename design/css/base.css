@@ -1,0 +1,101 @@
+/* ============================================================
+   Firmus Novus — base styles
+   ------------------------------------------------------------
+   Element resets, body defaults, the .font-display utility,
+   and the two motion primitives (drift + shimmer).
+   Pair with tokens.css.
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--color-white-50);
+  color: var(--color-slate-700);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  color: var(--color-navy-900);
+  font-weight: 600;
+}
+
+::selection {
+  background: var(--color-teal-100);
+  color: var(--color-navy-900);
+}
+
+/* ------------------------------------------------------------
+   .font-display — Fraunces, used on hero/page titles only.
+   Apply at h1/h2 level; never on body copy.
+   ------------------------------------------------------------ */
+.font-display {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+
+/* ------------------------------------------------------------
+   Motion — drift (hero pattern background)
+   ------------------------------------------------------------
+   The teal node-pattern SVG layered behind hero / onboarding
+   cards. Slow, almost subliminal — 8 seconds, alternating
+   direction, never disorienting.
+   ------------------------------------------------------------ */
+@keyframes firmus-drift {
+  0%   { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-40px, -40px, 0); }
+}
+.firmus-pattern-drift {
+  animation: firmus-drift 8s linear infinite alternate;
+}
+
+/* ------------------------------------------------------------
+   Motion — skeleton shimmer (loading states)
+   ------------------------------------------------------------
+   1.4s left-to-right gradient sweep. Use on the `.skeleton`
+   class for any placeholder block. Always pair with a sensible
+   `aria-busy` on the wrapping container.
+   ------------------------------------------------------------ */
+@keyframes firmus-shimmer {
+  0%   { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-slate-100) 0%,
+    var(--color-slate-50) 40%,
+    var(--color-slate-100) 80%
+  );
+  background-size: 200px 100%;
+  background-repeat: no-repeat;
+  animation: firmus-shimmer 1.4s infinite linear;
+  border-radius: 6px;
+}
+
+/* ------------------------------------------------------------
+   Reduced motion — respect prefers-reduced-motion.
+   ------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  .firmus-pattern-drift,
+  .skeleton {
+    animation: none;
+  }
+}
