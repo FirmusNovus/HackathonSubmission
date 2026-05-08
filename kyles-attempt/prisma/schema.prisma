@@ -1,0 +1,158 @@
+// Firmus Novus — database schema
+// Tokenized EUR is the platform's user-facing currency. All monetary fields use Decimal(10,2).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CLIENT
+  LAWYER
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum BookingStatus {
+  REQUESTED
+  ACCEPTED
+  DECLINED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum PricingKind {
+  HOURLY
+  FIXED
+  SUBSCRIPTION
+  SUCCESS
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  walletAddress      String    @unique
+  role               Role
+  email              String?   @unique
+  name               String?
+  avatarUrl          String?
+  // Identifier of the EBSI-conformant identity wallet provider the user picked
+  // ("ds" | "ekibis" | "edip" | "ssi" | "pwc" | "identfy" | "primus"). Null until selected.
+  ebsiWalletProvider String?
+  // Set after the Over18 EBSI VC is shared during client onboarding.
+  ageVerifiedAt      DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  lawyerProfile  LawyerProfile?
+  clientBookings Booking[]      @relation("ClientBookings")
+  conversations  Conversation[] @relation("ConversationParticipants")
+  messages       Message[]
+}
+
+// One-time SIWE nonces. Cleaned up periodically.
+model Nonce {
+  id        String   @id @default(cuid())
+  nonce     String   @unique
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model LawyerProfile {
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  city               String
+  headline           String
+  bio                String
+  specialties        String[]
+  languages          String[]
+  jurisdictions      String[]
+  pricingKind        PricingKind
+  // Display string ("€240 / hr", "from €450", "€890 / mo", "No win, no fee").
+  pricingHeadline    String
+  hourlyRateEUR      Decimal            @db.Decimal(10, 2)
+  consultationRate30 Decimal            @db.Decimal(10, 2)
+  consultationRate60 Decimal            @db.Decimal(10, 2)
+  // Service packages for non-hourly lawyers: [{ title, desc, price, unit }]
+  pricingItems       Json               @default("[]")
+  yearsExperience    Int
+  verificationStatus VerificationStatus @default(PENDING)
+  ebsiCredentialId   String?
+  barRegistrationNum String
+  barJurisdiction    String
+  admissionDate      DateTime
+  credentialDocsUrl  String[]
+  rating             Float              @default(0)
+  reviewCount        Int                @default(0)
+  availability       Json?
+  tags               String[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  bookings Booking[]
+}
+
+model Booking {
+  id                 String        @id @default(cuid())
+  clientId           String
+  client             User          @relation("ClientBookings", fields: [clientId], references: [id])
+  lawyerProfileId    String
+  lawyerProfile      LawyerProfile @relation(fields: [lawyerProfileId], references: [id])
+  scheduledAt        DateTime
+  durationMinutes    Int
+  // Invoice: explicit line items + concrete deliverables. Both parties must
+  // sign off (clientAcceptedAt + lawyerAcceptedAt) before escrow funds.
+  // lineItems    : [{ id, title, description, kind: "hourly"|"fixed", hours, ratePerHour, fixedPrice, subtotal }]
+  // deliverables : [{ id, title, description }]
+  lineItems          Json          @default("[]")
+  deliverables       Json          @default("[]")
+  clientAcceptedAt   DateTime?
+  lawyerAcceptedAt   DateTime?
+  consultationFeeEUR Decimal       @db.Decimal(10, 2)
+  platformFeeEUR     Decimal       @db.Decimal(10, 2)
+  status             BookingStatus @default(REQUESTED)
+  caseDescription    String
+  practiceArea       String
+  escrowTxHash       String?
+  escrowReleaseHash  String?
+  notes              String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  conversation Conversation?
+}
+
+model Conversation {
+  id           String   @id @default(cuid())
+  bookingId    String?  @unique
+  booking      Booking? @relation(fields: [bookingId], references: [id])
+  participants User[]   @relation("ConversationParticipants")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  messages Message[]
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id])
+  content        String
+  attachmentUrl  String?
+  attachmentType String?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+}
