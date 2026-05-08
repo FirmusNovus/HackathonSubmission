@@ -1,47 +1,35 @@
 // Owner spec: 001-verified-legal-engagement.
 
 import Link from 'next/link';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ClientOnboardingFlow } from './client-flow';
 import { isBypassActive } from '@/lib/dev/bypass-guard';
 
 export const dynamic = 'force-dynamic';
 
 export default function ClientConnect({ searchParams }: { searchParams?: { returnTo?: string } }) {
-  const bypass = isBypassActive();
+  const returnTo = searchParams?.returnTo ?? '/client/home';
   return (
-    <main className="mx-auto max-w-2xl px-6 py-16">
+    <main className="mx-auto max-w-2xl px-6 py-12">
       <h1 className="font-display text-3xl text-navy-900">Verify identity</h1>
       <p className="mt-2 text-sm text-slate-500">
-        Step 1: connect your wallet. Step 2: present a PID credential disclosing only
-        country and age 18+.
+        Sign in with your wallet, mint an EU PID credential at the issuer, and present
+        only <code>address.country</code> and <code>age_equal_or_over.18</code> to the
+        platform's verifier.
       </p>
 
-      <Card className="mt-8 space-y-4 p-6">
-        <div>
-          <div className="text-xs uppercase tracking-wide text-slate-500">Step 1</div>
-          <div className="text-base text-navy-900">Authenticate with wallet (SIWE)</div>
-        </div>
-        <div>
-          <div className="text-xs uppercase tracking-wide text-slate-500">Step 2</div>
-          <div className="text-base text-navy-900">Present PID credential (OID4VP)</div>
-          <p className="mt-1 text-xs text-slate-500">
-            Wallet handoff opens at <code>demo.wwwallet.org</code>. Only the country code
-            and the 18+ flag are disclosed.
-          </p>
-        </div>
-      </Card>
+      <div className="mt-6">
+        <ClientOnboardingFlow returnTo={returnTo} />
+      </div>
 
-      {bypass ? (
-        <Card className="mt-6 border-gold-500 bg-gold-100 p-6">
-          <div className="text-sm text-gold-700">
-            Dev bypass active. Pick a pre-staged client persona via{' '}
-            <Link href="/dev/personas" className="underline">
-              /dev/personas
-            </Link>
-            .
-          </div>
-        </Card>
+      {isBypassActive() ? (
+        <div className="mt-8 rounded-lg border border-gold-500 bg-gold-100 p-4 text-sm text-gold-700">
+          Dev bypass active. Persona picker:{' '}
+          <Link href="/dev/personas" className="underline">
+            /dev/personas
+          </Link>
+          .
+        </div>
       ) : null}
 
       <div className="mt-6">

@@ -1,3 +1,3 @@
+export * from './issue';
 export * from './parse';
-export * from './verify';
-export * from './sign';
+export { verifySdJwtVc } from './parse';
