@@ -22,6 +22,7 @@ SCENARIOS=(
   s15-direct-chain-tampering
   s16-large-payloads
   s17-many-proposals
+  s18-ui-render
 )
 
 PASS=0
