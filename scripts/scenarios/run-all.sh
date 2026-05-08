@@ -15,6 +15,11 @@ SCENARIOS=(
   s8b-offer-forgery
   s9-input-validation
   s10-edge-cases
+  s11-engagement-close
+  s12-free-then-paid
+  s13-stress-multi-engagement
+  s14-unicode-messages
+  s15-direct-chain-tampering
 )
 
 PASS=0

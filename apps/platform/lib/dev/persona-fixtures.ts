@@ -54,6 +54,13 @@ const wei = (eth: number): string => (BigInt(Math.round(eth * 1e6)) * 10n ** 12n
 
 export const PERSONAS: Persona[] = [
   {
+    index: 0,
+    get walletAddress() { return addrAt(0); },
+    displayName: 'Platform Operator',
+    roles: [],
+    disclosed_attrs: {},
+  },
+  {
     index: 1,
     get walletAddress() { return addrAt(1); },
     displayName: 'Anna Schmidt',

@@ -57,15 +57,15 @@ expect_match "$LATE" "ok.*true" "escalate succeeds at +30 days"
 PROP_DISPUTED=$(proposal_chain_state "$EID" 0)
 expect_eq "$(echo "$PROP_DISPUTED" | awk -F, '{print $2}')" "4" "proposal state=Disputed (4)"
 
-# Operator resolves 100% to the lawyer (the cooldown path implies the lawyer's
-# claim survived the no-response period from the client).
-set -a; source "$ROOT/.env"; set +a
+# Operator resolves 100% to the lawyer via the platform API (operator persona
+# 0 is now dev-bypass loginable).
 TOTAL=$(echo "$PROP_DISPUTED" | awk -F, '{print $1}')
-echo "  parked: $TOTAL wei → resolving 100% to lawyer"
-cast send "$ESCROW" "resolveDispute(uint256,uint256,uint256,uint256)" "$EID" 0 "$TOTAL" 0 \
-  --rpc-url "$RPC_URL" --private-key "$OPERATOR_PRIVATE_KEY" > /dev/null
-
-curl -s "$PLATFORM/api/chain-health" > /dev/null
+echo "  parked: $TOTAL wei → resolving 100% to lawyer (via /api/operator)"
+op_cookie=$(mktemp); login_as 0 "$op_cookie"
+RESV=$(curl -s -X POST -H "Content-Type: application/json" -b "$op_cookie" \
+  --data "{\"toLawyer\":\"$TOTAL\",\"toClient\":\"0\"}" \
+  "$PLATFORM/api/operator/disputes/$EID/0/resolve")
+expect_match "$RESV" "ok.*true" "operator resolveDispute via API"
 PROP_FINAL=$(proposal_chain_state "$EID" 0)
 expect_eq "$(echo "$PROP_FINAL" | awk -F, '{print $2}')" "5" "proposal state=Resolved (5)"
 expect_eq "$(echo "$PROP_FINAL" | awk -F, '{print $4}')" "$TOTAL" "amountToLawyer = total"

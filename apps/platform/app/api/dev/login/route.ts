@@ -14,7 +14,7 @@ import { createSession } from '@/lib/auth/session';
 
 export const runtime = 'nodejs';
 
-const Body = z.object({ persona: z.number().int().min(1).max(6) });
+const Body = z.object({ persona: z.number().int().min(0).max(6) });
 
 export async function POST(req: NextRequest) {
   if (!isBypassActive()) return NextResponse.json({ error: 'not-found' }, { status: 404 });
