@@ -1,0 +1,9 @@
+node_modules/
+.next/
+contracts/lib/
+contracts/out/
+contracts/cache/
+circuits/target/
+docs/spike/
+data/
+pnpm-lock.yaml
