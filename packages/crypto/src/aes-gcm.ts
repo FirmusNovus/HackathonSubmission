@@ -16,7 +16,7 @@ export async function deriveAesKey(
   const subtle = getSubtle();
   const baseKey = await subtle.importKey('raw', sharedSecret, 'HKDF', false, ['deriveKey']);
   return await subtle.deriveKey(
-    { name: 'HKDF', hash: 'SHA-256', salt, info: HKDF_INFO },
+    { name: 'HKDF', hash: 'SHA-256', salt: salt as BufferSource, info: HKDF_INFO as BufferSource },
     baseKey,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -32,7 +32,7 @@ export async function encryptMessage(
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveAesKey(sharedSecret, salt);
   const ciphertext = new Uint8Array(
-    await getSubtle().encrypt({ name: 'AES-GCM', iv }, key, plaintext),
+    await getSubtle().encrypt({ name: 'AES-GCM', iv: iv as BufferSource }, key, plaintext as BufferSource),
   );
   return { ciphertext, iv, salt };
 }
@@ -43,9 +43,9 @@ export async function decryptMessage(
 ): Promise<Uint8Array> {
   const key = await deriveAesKey(sharedSecret, envelope.salt);
   const plaintext = await getSubtle().decrypt(
-    { name: 'AES-GCM', iv: envelope.iv },
+    { name: 'AES-GCM', iv: envelope.iv as BufferSource },
     key,
-    envelope.ciphertext,
+    envelope.ciphertext as BufferSource,
   );
   return new Uint8Array(plaintext);
 }

@@ -31,7 +31,7 @@ export async function signEcdsa(
     false,
     ['sign'],
   );
-  const sig = await subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, data);
+  const sig = await subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, data as BufferSource);
   return new Uint8Array(sig);
 }
 
@@ -48,7 +48,7 @@ export async function verifyEcdsa(
     false,
     ['verify'],
   );
-  return await subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, signature, data);
+  return await subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, signature as BufferSource, data as BufferSource);
 }
 
 function getSubtle(): SubtleCrypto {

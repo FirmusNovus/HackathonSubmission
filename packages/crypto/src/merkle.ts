@@ -7,7 +7,7 @@ export type HexString = `0x${string}`;
 
 async function sha256(bytes: Uint8Array): Promise<Uint8Array> {
   if (typeof globalThis.crypto?.subtle !== 'undefined') {
-    return new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes));
+    return new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes as BufferSource));
   }
   // Node fallback for tests outside the browser bundle.
   const { createHash } = await import('node:crypto');

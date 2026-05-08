@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-navy-950: #0a1428;
+    --color-navy-900: #0a1f44;
+    --color-navy-800: #102a4c;
+    --color-navy-700: #1a3666;
+    --color-slate-900: #1a2533;
+    --color-slate-700: #2c3e50;
+    --color-slate-500: #5b6b7c;
+    --color-slate-300: #a8b3bf;
+    --color-slate-200: #cfd6dd;
+    --color-slate-100: #e5e9ee;
+    --color-slate-50: #eef1f4;
+    --color-white-50: #f4f6f8;
+    --color-white-0: #ffffff;
+    --color-teal-500: #14b8a6;
+    --color-teal-600: #0e9488;
+    --color-teal-700: #0b7a70;
+    --color-gold-500: #c9a961;
+    --color-gold-700: #9c7e3f;
+    --shadow-sm: 0 1px 2px rgba(10, 31, 68, 0.04), 0 1px 3px rgba(10, 31, 68, 0.06);
+    --shadow-md: 0 4px 8px rgba(10, 31, 68, 0.06), 0 8px 24px rgba(10, 31, 68, 0.08);
+    --shadow-lg: 0 12px 24px rgba(10, 31, 68, 0.08), 0 24px 48px rgba(10, 31, 68, 0.12);
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    background: var(--color-white-50);
+    color: var(--color-slate-700);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin: 0;
+    color: var(--color-navy-900);
+    font-weight: 600;
+  }
+
+  ::selection {
+    background: #ccf5ef;
+    color: var(--color-navy-900);
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-fraunces), Fraunces, Georgia, serif;
+    font-weight: 400;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+  }
+}
+
+@keyframes firmus-shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #e5e9ee 0%, #eef1f4 40%, #e5e9ee 80%);
+  background-size: 200px 100%;
+  background-repeat: no-repeat;
+  animation: firmus-shimmer 1.4s infinite linear;
+  border-radius: 6px;
+}

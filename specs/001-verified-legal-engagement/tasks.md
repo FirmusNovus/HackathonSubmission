@@ -76,78 +76,78 @@ This is a pnpm-workspace monorepo with three runtime processes:
 
 ### Chain bindings + viem
 
-- [ ] T030 Create `apps/platform/lib/chain/client.ts`: viem clients for `publicClient` and `walletClient` (operator key from env). Owner spec: 001 — top-of-file comment.
-- [ ] T031 [P] Create `apps/platform/lib/chain/contracts.ts`: typed bindings for `AttestationManager`, `LegalEngagementEscrow`, generated from the deployed addresses in `addresses.ts`.
-- [ ] T032 [P] Create `apps/platform/lib/chain/eas.ts`: helpers for the two EAS schema UIDs (`SCHEMA_LAWYER`, `SCHEMA_CLIENT`).
-- [ ] T033 Implement `apps/platform/app/api/chain-health/route.ts`: GET handler that probes `eth_blockNumber` with a 5-second cache; returns `{healthy, lastBlock?, lastChecked}` (FR-060).
-- [ ] T034 Implement `apps/platform/lib/chain/indexer.ts`: viem `watchContractEvent` daemon that listens for `EngagementOpened`, `Proposal*`, `TranscriptAnchored`, `EngagementClosed`, `Attested`, `Revoked`; reconciles the off-chain SQLite mirrors. Resilient to chain unavailability (FR-061).
+- [X] T030 Create `apps/platform/lib/chain/client.ts`: viem clients for `publicClient` and `walletClient` (operator key from env). Owner spec: 001 — top-of-file comment.
+- [X] T031 [P] Create `apps/platform/lib/chain/contracts.ts`: typed bindings for `AttestationManager`, `LegalEngagementEscrow`, generated from the deployed addresses in `addresses.ts`.
+- [X] T032 [P] Create `apps/platform/lib/chain/eas.ts`: helpers for the two EAS schema UIDs (`SCHEMA_LAWYER`, `SCHEMA_CLIENT`).
+- [X] T033 Implement `apps/platform/app/api/chain-health/route.ts`: GET handler that probes `eth_blockNumber` with a 5-second cache; returns `{healthy, lastBlock?, lastChecked}` (FR-060).
+- [X] T034 Implement `apps/platform/lib/chain/indexer.ts`: viem `watchContractEvent` daemon that listens for `EngagementOpened`, `Proposal*`, `TranscriptAnchored`, `EngagementClosed`, `Attested`, `Revoked`; reconciles the off-chain SQLite mirrors. Resilient to chain unavailability (FR-061).
 
 ### SIWE + nonces (both apps)
 
-- [ ] T035 Create `apps/platform/lib/siwe/nonce.ts`: nonce generation, persist to `nonces` table, mark used on consume.
-- [ ] T036 [P] Create `apps/platform/lib/siwe/verify.ts`: SIWE message + signature verification using the `siwe` lib; rejects reused nonces.
-- [ ] T037 [P] Implement `apps/platform/app/api/auth/siwe/{nonce,verify,logout}/route.ts`: GET nonce, POST verify (sets session cookie), POST logout.
-- [ ] T038 [P] Mirror `apps/issuer/app/api/issuer/auth/siwe/{nonce,verify}/route.ts` with the issuer's separate session cookie domain.
-- [ ] T039 Create `apps/platform/middleware.ts`: role-gated routing for `/client/*`, `/lawyer/*`, `/operator/*`, `/verify-lawyer`. 404 (not 403) on role mismatch to avoid leaking path existence.
+- [X] T035 Create `apps/platform/lib/siwe/nonce.ts`: nonce generation, persist to `nonces` table, mark used on consume.
+- [X] T036 [P] Create `apps/platform/lib/siwe/verify.ts`: SIWE message + signature verification using the `siwe` lib; rejects reused nonces.
+- [X] T037 [P] Implement `apps/platform/app/api/auth/siwe/{nonce,verify,logout}/route.ts`: GET nonce, POST verify (sets session cookie), POST logout.
+- [X] T038 [P] Mirror `apps/issuer/app/api/issuer/auth/siwe/{nonce,verify}/route.ts` with the issuer's separate session cookie domain.
+- [X] T039 Create `apps/platform/middleware.ts`: role-gated routing for `/client/*`, `/lawyer/*`, `/operator/*`, `/verify-lawyer`. 404 (not 403) on role mismatch to avoid leaking path existence.
 
 ### Issuer SQLite schema + seed
 
-- [ ] T040 Create `apps/issuer/lib/db/schema.ts`: `subjects`, `issuer_pre_auth_codes`, `issuer_access_tokens`, `credential_offers` tables per [data-model.md](./data-model.md#issuer-db--subjects). Migration runs on app boot.
-- [ ] T041 Implement `apps/issuer/scripts/seed.ts`: populates `subjects` with five lawyers (anvil indices 1–5, both PID + bar rows) and one client (anvil index 6, PID only). Owner spec: 001.
-- [ ] T042 Implement `apps/issuer/lib/keys.ts`: at first boot, generate `pid-signing-key.jwk` and `bar-signing-key.jwk` as ES256 P-256 JWKs at `apps/issuer/data/`. Idempotent: skips if files exist.
+- [X] T040 Create `apps/issuer/lib/db/schema.ts`: `subjects`, `issuer_pre_auth_codes`, `issuer_access_tokens`, `credential_offers` tables per [data-model.md](./data-model.md#issuer-db--subjects). Migration runs on app boot.
+- [X] T041 Implement `apps/issuer/scripts/seed.ts`: populates `subjects` with five lawyers (anvil indices 1–5, both PID + bar rows) and one client (anvil index 6, PID only). Owner spec: 001.
+- [X] T042 Implement `apps/issuer/lib/keys.ts`: at first boot, generate `pid-signing-key.jwk` and `bar-signing-key.jwk` as ES256 P-256 JWKs at `apps/issuer/data/`. Idempotent: skips if files exist.
 
 ### Platform SQLite schema
 
-- [ ] T043 Create `apps/platform/lib/db/client.ts`: better-sqlite3 wrapper with WAL mode and foreign keys ON. Owner spec: 001.
-- [ ] T044 Create `apps/platform/lib/db/schema.ts`: `verified_users`, `lawyer_profiles`, `engagements_off_chain`, `consultations`, `proposals_off_chain`, `messages`, `mutual_refund_authorizations`, `disputes_off_chain`, `nonces`, `verifier_states` per [data-model.md](./data-model.md#platform-db--verified_users). Migrations run on boot.
-- [ ] T045 [P] Create `apps/platform/lib/db/verified-users.ts`: per-feature data access for `verified_users` (composite PK on `(eth_address, attested_role)`). Owner spec: 001.
-- [ ] T046 [P] Create `apps/platform/lib/db/lawyer-profiles.ts`: per-feature data access for `lawyer_profiles`. Owner spec: 001.
-- [ ] T047 [P] Create `apps/platform/lib/db/engagements.ts`: data access for `engagements_off_chain`. Owner spec: 001.
-- [ ] T048 [P] Create `apps/platform/lib/db/consultations.ts`: data access for `consultations` (state machine helpers + `expires_at` computation, FR-015a). Owner spec: 001.
-- [ ] T049 [P] Create `apps/platform/lib/db/proposals.ts`: data access for `proposals_off_chain`. Owner spec: 001.
-- [ ] T050 [P] Create `apps/platform/lib/db/messages.ts`: data access for `messages`; rejects any insert with a top-level `plaintext` field (FR-036).
-- [ ] T051 [P] Create `apps/platform/lib/db/disputes.ts`: data access for `disputes_off_chain`. Owner spec: 001.
+- [X] T043 Create `apps/platform/lib/db/client.ts`: better-sqlite3 wrapper with WAL mode and foreign keys ON. Owner spec: 001.
+- [X] T044 Create `apps/platform/lib/db/schema.ts`: `verified_users`, `lawyer_profiles`, `engagements_off_chain`, `consultations`, `proposals_off_chain`, `messages`, `mutual_refund_authorizations`, `disputes_off_chain`, `nonces`, `verifier_states` per [data-model.md](./data-model.md#platform-db--verified_users). Migrations run on boot.
+- [X] T045 [P] Create `apps/platform/lib/db/verified-users.ts`: per-feature data access for `verified_users` (composite PK on `(eth_address, attested_role)`). Owner spec: 001.
+- [X] T046 [P] Create `apps/platform/lib/db/lawyer-profiles.ts`: per-feature data access for `lawyer_profiles`. Owner spec: 001.
+- [X] T047 [P] Create `apps/platform/lib/db/engagements.ts`: data access for `engagements_off_chain`. Owner spec: 001.
+- [X] T048 [P] Create `apps/platform/lib/db/consultations.ts`: data access for `consultations` (state machine helpers + `expires_at` computation, FR-015a). Owner spec: 001.
+- [X] T049 [P] Create `apps/platform/lib/db/proposals.ts`: data access for `proposals_off_chain`. Owner spec: 001.
+- [X] T050 [P] Create `apps/platform/lib/db/messages.ts`: data access for `messages`; rejects any insert with a top-level `plaintext` field (FR-036).
+- [X] T051 [P] Create `apps/platform/lib/db/disputes.ts`: data access for `disputes_off_chain`. Owner spec: 001.
 
 ### Reverse proxy
 
-- [ ] T052 Implement `apps/proxy/src/index.ts`: Node HTTP server on port 3000 routing `/api/issuer/*` and `/issuer/*` → `http://localhost:3001`, everything else → `http://localhost:3010`. Forwards X-Forwarded-* headers correctly so SIWE verification works.
+- [X] T052 Implement `apps/proxy/src/index.ts`: Node HTTP server on port 3000 routing `/api/issuer/*` and `/issuer/*` → `http://localhost:3001`, everything else → `http://localhost:3010`. Forwards X-Forwarded-* headers correctly so SIWE verification works.
 
 ### Design system + UI primitives
 
-- [ ] T053 [P] Create `apps/platform/components/ui/button.tsx`, `input.tsx`, `card.tsx`, `tabs.tsx`, `chip.tsx` per `design/components.md`. Tokens-only (Constitution IX, item 4).
-- [ ] T054 [P] Create `apps/platform/components/firmus/avatar-bubble.tsx`: renders initials over slate-50 by default; if `imageUrl` prop is set, renders the image; gold verified ring at 2-px outline. Sizes: 32 / 56 / 64 / 80 / 96 px.
-- [ ] T055 [P] Create `apps/platform/components/firmus/ebsi-badge.tsx`: gold pill with the lucide `ShieldCheck` icon and the truncated EAS attestation UID; clicking opens a panel with the full UID and a chain-explorer link.
-- [ ] T056 [P] Create `apps/platform/components/firmus/lawyer-card.tsx`: directory + recently-joined card per `design/components.md` §LawyerCard. No business logic imports — props-driven.
-- [ ] T057 [P] Create `apps/platform/components/firmus/pricing-badge.tsx`, `stars.tsx`, `escrow-status-indicator.tsx`, `chain-unavailable-banner.tsx` (FR-060), `dev-mode-banner.tsx` (FR-D03).
-- [ ] T058 [P] Create `apps/platform/lib/format/eth.ts`: `formatETH(wei: bigint): string` truncates to 4 decimal places, never produces scientific notation. Forbid `formatEUR`.
-- [ ] T059 [P] Create `apps/platform/lib/format/address.ts`: `truncateAddress(addr: string): string` produces `0x4f02…2c1a`.
-- [ ] T060 [P] Create `apps/platform/lib/anonymize/client-id.ts`: `anonymousClientId(walletAddress: string): string` returns `anon-XXXX` (first 4 hex chars of `keccak256("platform" || walletAddress)`).
+- [X] T053 [P] Create `apps/platform/components/ui/button.tsx`, `input.tsx`, `card.tsx`, `tabs.tsx`, `chip.tsx` per `design/components.md`. Tokens-only (Constitution IX, item 4).
+- [X] T054 [P] Create `apps/platform/components/firmus/avatar-bubble.tsx`: renders initials over slate-50 by default; if `imageUrl` prop is set, renders the image; gold verified ring at 2-px outline. Sizes: 32 / 56 / 64 / 80 / 96 px.
+- [X] T055 [P] Create `apps/platform/components/firmus/ebsi-badge.tsx`: gold pill with the lucide `ShieldCheck` icon and the truncated EAS attestation UID; clicking opens a panel with the full UID and a chain-explorer link.
+- [X] T056 [P] Create `apps/platform/components/firmus/lawyer-card.tsx`: directory + recently-joined card per `design/components.md` §LawyerCard. No business logic imports — props-driven.
+- [X] T057 [P] Create `apps/platform/components/firmus/pricing-badge.tsx`, `stars.tsx`, `escrow-status-indicator.tsx`, `chain-unavailable-banner.tsx` (FR-060), `dev-mode-banner.tsx` (FR-D03).
+- [X] T058 [P] Create `apps/platform/lib/format/eth.ts`: `formatETH(wei: bigint): string` truncates to 4 decimal places, never produces scientific notation. Forbid `formatEUR`.
+- [X] T059 [P] Create `apps/platform/lib/format/address.ts`: `truncateAddress(addr: string): string` produces `0x4f02…2c1a`.
+- [X] T060 [P] Create `apps/platform/lib/anonymize/client-id.ts`: `anonymousClientId(walletAddress: string): string` returns `anon-XXXX` (first 4 hex chars of `keccak256("platform" || walletAddress)`).
 
 ### Crypto primitives (browser-only)
 
-- [ ] T061 Create `packages/crypto/src/ecdh.ts`: ECDH P-256 key generation and shared-secret derivation via WebCrypto. ALL exports are browser-only.
-- [ ] T062 [P] Create `packages/crypto/src/aes-gcm.ts`: AES-GCM-256 encrypt / decrypt with HKDF-SHA-256 key derivation.
-- [ ] T063 [P] Create `packages/crypto/src/ecdsa.ts`: ECDSA P-256 sign / verify.
-- [ ] T064 [P] Create `packages/crypto/src/merkle.ts`: incremental Merkle tree (depth 16) with SHA-256 leaves; `appendLeaf` returns new root.
-- [ ] T065 Create `apps/platform/lib/crypto/client/index.ts`: re-exports from `packages/crypto/`. The `apps/platform/lib/crypto/server/` directory MUST NOT exist (no server-side decryption helpers — Constitution Inv 1).
+- [X] T061 Create `packages/crypto/src/ecdh.ts`: ECDH P-256 key generation and shared-secret derivation via WebCrypto. ALL exports are browser-only.
+- [X] T062 [P] Create `packages/crypto/src/aes-gcm.ts`: AES-GCM-256 encrypt / decrypt with HKDF-SHA-256 key derivation.
+- [X] T063 [P] Create `packages/crypto/src/ecdsa.ts`: ECDSA P-256 sign / verify.
+- [X] T064 [P] Create `packages/crypto/src/merkle.ts`: incremental Merkle tree (depth 16) with SHA-256 leaves; `appendLeaf` returns new root.
+- [X] T065 Create `apps/platform/lib/crypto/client/index.ts`: re-exports from `packages/crypto/`. The `apps/platform/lib/crypto/server/` directory MUST NOT exist (no server-side decryption helpers — Constitution Inv 1).
 
 ### Operator + dev-bypass scaffolding
 
-- [ ] T066 Create `apps/platform/lib/operator.ts`: loads `OPERATOR_PRIVATE_KEY` from `.env.local`; refuses to load if `NODE_ENV='production'` AND the key is the demo anvil[0] value. Provides a viem `walletClient` for writing EAS attestations.
-- [ ] T067 Create `apps/platform/lib/dev/persona-fixtures.ts`: TypeScript const with the six personas (anvil indices 1–6); each carries `walletAddress`, `displayName`, `roles[]`, `disclosed_attrs.client`, `disclosed_attrs.lawyer?`, `messageKeyPair: {pub, priv}` (P-256), `lawyerProfile?` fixture. Top-of-file comment forbids imports from any module under `apps/platform/lib/` outside `lib/dev/`.
-- [ ] T068 [P] Create `apps/platform/lib/dev/bypass-guard.ts`: `assertBypassActive()` throws unless `process.env.DEV_BYPASS_EUDI === '1'`; also refuses to start if `NODE_ENV === 'production'` (FR-D01).
-- [ ] T069 Implement `apps/platform/app/api/dev/login/route.ts`: POST `{persona}` performs the seeding flow per FR-D06; idempotent. 404 unless bypass is active.
-- [ ] T070 [P] Implement `apps/platform/app/api/dev/reset/route.ts`: clears all platform DB rows; reverts the Anvil chain via `evm_revert` to a fresh snapshot. 404 unless bypass is active.
-- [ ] T071 [P] Implement `apps/platform/app/api/dev/skip-time/route.ts`: POST `{seconds}` calls `evm_increaseTime` + `evm_mine` on Anvil. 404 unless bypass is active.
-- [ ] T072 Implement `apps/platform/app/dev/personas/page.tsx`: persona picker UI listing fixture personas with cleartext name, role, truncated address. 404 unless bypass is active.
+- [X] T066 Create `apps/platform/lib/operator.ts`: loads `OPERATOR_PRIVATE_KEY` from `.env.local`; refuses to load if `NODE_ENV='production'` AND the key is the demo anvil[0] value. Provides a viem `walletClient` for writing EAS attestations.
+- [X] T067 Create `apps/platform/lib/dev/persona-fixtures.ts`: TypeScript const with the six personas (anvil indices 1–6); each carries `walletAddress`, `displayName`, `roles[]`, `disclosed_attrs.client`, `disclosed_attrs.lawyer?`, `messageKeyPair: {pub, priv}` (P-256), `lawyerProfile?` fixture. Top-of-file comment forbids imports from any module under `apps/platform/lib/` outside `lib/dev/`.
+- [X] T068 [P] Create `apps/platform/lib/dev/bypass-guard.ts`: `assertBypassActive()` throws unless `process.env.DEV_BYPASS_EUDI === '1'`; also refuses to start if `NODE_ENV === 'production'` (FR-D01).
+- [X] T069 Implement `apps/platform/app/api/dev/login/route.ts`: POST `{persona}` performs the seeding flow per FR-D06; idempotent. 404 unless bypass is active.
+- [X] T070 [P] Implement `apps/platform/app/api/dev/reset/route.ts`: clears all platform DB rows; reverts the Anvil chain via `evm_revert` to a fresh snapshot. 404 unless bypass is active.
+- [X] T071 [P] Implement `apps/platform/app/api/dev/skip-time/route.ts`: POST `{seconds}` calls `evm_increaseTime` + `evm_mine` on Anvil. 404 unless bypass is active.
+- [X] T072 Implement `apps/platform/app/dev/personas/page.tsx`: persona picker UI listing fixture personas with cleartext name, role, truncated address. 404 unless bypass is active.
 
 ### CI invariant gates
 
-- [ ] T073 Create `scripts/check-isolation.sh`: starts the issuer alone, posts a credential offer, then starts the platform alone, verifies the platform can fetch the issuer's `.well-known/jwks.json` over HTTP. Exits non-zero on failure.
-- [ ] T074 [P] Create `scripts/check-feature-isolation.sh`: greps `apps/platform/app/(client|lawyer|operator)/**` for cross-feature imports between siblings; exits non-zero on any direct sibling-feature import.
-- [ ] T075 [P] Create `scripts/check-brand-mentions.sh`: confirms exactly one mention of the public brand name in spec / plan title lines, zero mentions in spec body, zero mentions of the alternative names from prior drafts in the entire repo.
-- [ ] T076 [P] Create `scripts/check-no-server-decryption.sh`: greps `apps/platform/lib/` (excluding `lib/crypto/client/` and `lib/dev/`) for AES-GCM-decrypt or ECDH-derive imports; exits non-zero on any match (Constitution Inv 1).
-- [ ] T077 [P] Add `.github/workflows/ci.yml` running: `forge test`, `pnpm test` (vitest), `pnpm madge --circular apps/platform/`, `scripts/check-feature-isolation.sh`, `scripts/check-brand-mentions.sh`, `scripts/check-no-server-decryption.sh`, `scripts/check-isolation.sh`.
+- [X] T073 Create `scripts/check-isolation.sh`: starts the issuer alone, posts a credential offer, then starts the platform alone, verifies the platform can fetch the issuer's `.well-known/jwks.json` over HTTP. Exits non-zero on failure.
+- [X] T074 [P] Create `scripts/check-feature-isolation.sh`: greps `apps/platform/app/(client|lawyer|operator)/**` for cross-feature imports between siblings; exits non-zero on any direct sibling-feature import.
+- [X] T075 [P] Create `scripts/check-brand-mentions.sh`: confirms exactly one mention of the public brand name in spec / plan title lines, zero mentions in spec body, zero mentions of the alternative names from prior drafts in the entire repo.
+- [X] T076 [P] Create `scripts/check-no-server-decryption.sh`: greps `apps/platform/lib/` (excluding `lib/crypto/client/` and `lib/dev/`) for AES-GCM-decrypt or ECDH-derive imports; exits non-zero on any match (Constitution Inv 1).
+- [X] T077 [P] Add `.github/workflows/ci.yml` running: `forge test`, `pnpm test` (vitest), `pnpm madge --circular apps/platform/`, `scripts/check-feature-isolation.sh`, `scripts/check-brand-mentions.sh`, `scripts/check-no-server-decryption.sh`, `scripts/check-isolation.sh`.
 
 **Checkpoint**: foundation ready — user story implementation can now begin in parallel.
 
@@ -159,17 +159,17 @@ This is a pnpm-workspace monorepo with three runtime processes:
 
 **Independent Test**: visit `/` unauthenticated → see hero + How It Works + recently-joined cards → click "Find a Lawyer" → directory loads → apply specialty filter → result narrows → click a lawyer card → profile renders with About / Credentials / Reviews / Availability tabs and the verification badge UID resolves on click.
 
-- [ ] T078 [P] [US1] Create `apps/platform/app/(marketing)/layout.tsx`: marketing nav + footer chrome.
-- [ ] T079 [P] [US1] Create `apps/platform/app/(marketing)/page.tsx`: landing page with hero ("Verified Legal Counsel, On-Chain."), three "How It Works" steps (lucide `MessageSquare`, `ShieldCheck`, `Lock`), trust strip, recently-joined `LawyerCard` × 3 (per [design/pages.md §1](../../design/pages.md)).
-- [ ] T080 [US1] Create `apps/platform/app/(marketing)/lawyers/page.tsx`: directory page with sticky filters bar (Specialty / Language / Pricing / Sort) and `LawyerCard` grid.
-- [ ] T081 [US1] Create `apps/platform/app/(marketing)/lawyers/directory-filters.tsx`: client component for filter chips; debounced URL-param updates.
-- [ ] T082 [US1] Create `apps/platform/app/(marketing)/lawyers/[id]/page.tsx`: lawyer profile with profile header (avatar, name, specialty · city, stars, EBSI badge), two-column grid with tabs and sticky booking sidebar (per [design/pages.md §3](../../design/pages.md)).
-- [ ] T083 [P] [US1] Create `apps/platform/app/(marketing)/lawyers/[id]/about-tab.tsx`, `credentials-tab.tsx`, `reviews-tab.tsx` (empty-state placeholder), `availability-tab.tsx`.
-- [ ] T084 [US1] Implement `apps/platform/app/api/lawyers/route.ts`: GET handler joining `verified_users` (where `attested_role='lawyer' AND revoked_at IS NULL AND validUntil >= now`) with `lawyer_profiles`. Filters from query params. ORDER BY `attested_at DESC` for default sort.
-- [ ] T085 [US1] Implement `apps/platform/app/api/lawyers/[id]/route.ts`: GET handler returning the LawyerDirectoryRow shape per [spec.md Key Entities](./spec.md#key-entities). 404 if attestation revoked/expired/missing.
-- [ ] T086 [P] [US1] Add live `hasCapability` check on the EBSI badge click (calls `viem.readContract(AttestationManager.hasCapability)`); displays the UID + chain-explorer link.
-- [ ] T087 [P] [US1] Add `LawyerCard` empty-state for the zero-results filter case ("No matching counsel. Try removing a filter." with `Clear filters` CTA).
-- [ ] T088 [P] [US1] Add Playwright E2E `apps/platform/__tests__/us1-discovery.spec.ts`: load `/`, scroll, click `/lawyers`, apply a filter, click a card, verify profile renders. Uses `DEV_BYPASS_EUDI=1` to seed three verified lawyers via `/api/dev/login`.
+- [X] T078 [P] [US1] Create `apps/platform/app/(marketing)/layout.tsx`: marketing nav + footer chrome.
+- [X] T079 [P] [US1] Create `apps/platform/app/(marketing)/page.tsx`: landing page with hero ("Verified Legal Counsel, On-Chain."), three "How It Works" steps (lucide `MessageSquare`, `ShieldCheck`, `Lock`), trust strip, recently-joined `LawyerCard` × 3 (per [design/pages.md §1](../../design/pages.md)).
+- [X] T080 [US1] Create `apps/platform/app/(marketing)/lawyers/page.tsx`: directory page with sticky filters bar (Specialty / Language / Pricing / Sort) and `LawyerCard` grid.
+- [X] T081 [US1] Create `apps/platform/app/(marketing)/lawyers/directory-filters.tsx`: client component for filter chips; debounced URL-param updates.
+- [X] T082 [US1] Create `apps/platform/app/(marketing)/lawyers/[id]/page.tsx`: lawyer profile with profile header (avatar, name, specialty · city, stars, EBSI badge), two-column grid with tabs and sticky booking sidebar (per [design/pages.md §3](../../design/pages.md)).
+- [X] T083 [P] [US1] Create `apps/platform/app/(marketing)/lawyers/[id]/about-tab.tsx`, `credentials-tab.tsx`, `reviews-tab.tsx` (empty-state placeholder), `availability-tab.tsx`.
+- [X] T084 [US1] Implement `apps/platform/app/api/lawyers/route.ts`: GET handler joining `verified_users` (where `attested_role='lawyer' AND revoked_at IS NULL AND validUntil >= now`) with `lawyer_profiles`. Filters from query params. ORDER BY `attested_at DESC` for default sort.
+- [X] T085 [US1] Implement `apps/platform/app/api/lawyers/[id]/route.ts`: GET handler returning the LawyerDirectoryRow shape per [spec.md Key Entities](./spec.md#key-entities). 404 if attestation revoked/expired/missing.
+- [X] T086 [P] [US1] Add live `hasCapability` check on the EBSI badge click (calls `viem.readContract(AttestationManager.hasCapability)`); displays the UID + chain-explorer link.
+- [X] T087 [P] [US1] Add `LawyerCard` empty-state for the zero-results filter case ("No matching counsel. Try removing a filter." with `Clear filters` CTA).
+- [X] T088 [P] [US1] Add Playwright E2E `apps/platform/__tests__/us1-discovery.spec.ts`: load `/`, scroll, click `/lawyers`, apply a filter, click a card, verify profile renders. Uses `DEV_BYPASS_EUDI=1` to seed three verified lawyers via `/api/dev/login`.
 
 **Checkpoint**: US1 ships an MVP discovery surface independently of any onboarding work.
 
@@ -183,34 +183,34 @@ This is a pnpm-workspace monorepo with three runtime processes:
 
 ### Issuer side (OID4VCI for both credential types)
 
-- [ ] T089 [US2] Implement `apps/issuer/app/api/issuer/pid/.well-known/openid-credential-issuer/route.ts`: GET handler returning issuer metadata for `urn:eudi:pid:1`. Sends `Cache-Control: no-store`.
-- [ ] T090 [P] [US2] Implement `apps/issuer/app/api/issuer/pid/.well-known/jwks.json/route.ts`: returns the PID public key from `pid-signing-key.jwk`.
-- [ ] T091 [US2] Implement `apps/issuer/app/api/issuer/pid/credential-offer/route.ts`: POST creates a pre-auth code, stores the offer JSON at `credential_offer_uri`, returns the HTTPS handoff URL `https://demo.wwwallet.org/cb?credential_offer_uri=<encoded>`.
-- [ ] T092 [P] [US2] Implement `apps/issuer/app/api/issuer/pid/token/route.ts`: OID4VCI token endpoint (pre-authorized code grant + DPoP).
-- [ ] T093 [US2] Implement `apps/issuer/app/api/issuer/pid/credential/route.ts`: issues SD-JWT VC `urn:eudi:pid:1` signed with `pid-signing-key.jwk`. `iss` claim is the issuer's HTTPS hostname (NOT did:key).
-- [ ] T094 [P] [US2] Mirror PID routes for the bar credential at `apps/issuer/app/api/issuer/bar/{.well-known/openid-credential-issuer,.well-known/jwks.json,credential-offer,token,credential}/route.ts`. Bar credential offer gates on `subjects WHERE eth_address=<wallet> AND credential_type='bar'`; 403 if not on the bar roster.
-- [ ] T095 [US2] Implement `apps/issuer/app/(issuer)/page.tsx`: credential picker UI. Shows tiles for PID and bar; bar tile is greyed out when the SIWE-bound wallet is not on the bar roster.
-- [ ] T096 [P] [US2] Add E2E test (vitest, against the live spike) verifying both credential issuances complete end-to-end.
+- [X] T089 [US2] Implement `apps/issuer/app/api/issuer/pid/.well-known/openid-credential-issuer/route.ts`: GET handler returning issuer metadata for `urn:eudi:pid:1`. Sends `Cache-Control: no-store`.
+- [X] T090 [P] [US2] Implement `apps/issuer/app/api/issuer/pid/.well-known/jwks.json/route.ts`: returns the PID public key from `pid-signing-key.jwk`.
+- [X] T091 [US2] Implement `apps/issuer/app/api/issuer/pid/credential-offer/route.ts`: POST creates a pre-auth code, stores the offer JSON at `credential_offer_uri`, returns the HTTPS handoff URL `https://demo.wwwallet.org/cb?credential_offer_uri=<encoded>`.
+- [X] T092 [P] [US2] Implement `apps/issuer/app/api/issuer/pid/token/route.ts`: OID4VCI token endpoint (pre-authorized code grant + DPoP).
+- [X] T093 [US2] Implement `apps/issuer/app/api/issuer/pid/credential/route.ts`: issues SD-JWT VC `urn:eudi:pid:1` signed with `pid-signing-key.jwk`. `iss` claim is the issuer's HTTPS hostname (NOT did:key).
+- [X] T094 [P] [US2] Mirror PID routes for the bar credential at `apps/issuer/app/api/issuer/bar/{.well-known/openid-credential-issuer,.well-known/jwks.json,credential-offer,token,credential}/route.ts`. Bar credential offer gates on `subjects WHERE eth_address=<wallet> AND credential_type='bar'`; 403 if not on the bar roster.
+- [X] T095 [US2] Implement `apps/issuer/app/(issuer)/page.tsx`: credential picker UI. Shows tiles for PID and bar; bar tile is greyed out when the SIWE-bound wallet is not on the bar roster.
+- [X] T096 [P] [US2] Add E2E test (vitest, against the live spike) verifying both credential issuances complete end-to-end.
 
 ### Platform side (OID4VP verifier)
 
-- [ ] T097 [US2] Implement `apps/platform/lib/verifier/x509-cert.ts`: at boot, generate a self-signed RSA cert with CN = `process.env.NGROK_HOSTNAME`. Persist to `apps/platform/data/verifier-cert.pem`.
-- [ ] T098 [US2] Implement `apps/platform/app/api/verifier/x509-cert.pem/route.ts`: serves the cert.
-- [ ] T099 [P] [US2] Create `packages/dcql/src/builders.ts`: DCQL query builders for PID and bar presentations per [contracts/credential-shapes.md](./contracts/credential-shapes.md).
-- [ ] T100 [P] [US2] Create `packages/sd-jwt/src/{parse,verify,sign}.ts`: SD-JWT VC parse + verify (against issuer JWKS over HTTP) + sign helpers.
-- [ ] T101 [US2] Implement `apps/platform/app/api/verifier/request/route.ts`: POST creates a presentation request (kind ∈ `{pid, bar}`); stores the signed JWS request object (with `typ=oauth-authz-req+jwt` and `x5c` header chain); returns the HTTPS handoff URL `https://demo.wwwallet.org/cb?client_id=...&request_uri=...`.
-- [ ] T102 [P] [US2] Implement `apps/platform/app/api/verifier/request/[state]/object/route.ts`: GET returns the signed JWS request object.
-- [ ] T103 [US2] Implement `apps/platform/app/api/verifier/response/[state]/route.ts`: POST receives `vp_token` (parses BOTH string and array shapes — wwWallet quirk). Verifies SD-JWT VC against issuer JWKS, holder binding (KB-JWT signed by `cnf.jwk`; binding key matches SIWE address), validity end-date. On success, writes the appropriate EAS attestation via `AttestationManager.attestVerifiedClient` or `attestVerifiedLawyer` from the operator key; persists `verified_users` row.
-- [ ] T104 [P] [US2] Implement `apps/platform/app/api/verifier/result/[state]/route.ts`: polled by browser; returns 200 + verified attribute subset, 202 (pending), or 4xx with reason.
+- [X] T097 [US2] Implement `apps/platform/lib/verifier/x509-cert.ts`: at boot, generate a self-signed RSA cert with CN = `process.env.NGROK_HOSTNAME`. Persist to `apps/platform/data/verifier-cert.pem`.
+- [X] T098 [US2] Implement `apps/platform/app/api/verifier/x509-cert.pem/route.ts`: serves the cert.
+- [X] T099 [P] [US2] Create `packages/dcql/src/builders.ts`: DCQL query builders for PID and bar presentations per [contracts/credential-shapes.md](./contracts/credential-shapes.md).
+- [X] T100 [P] [US2] Create `packages/sd-jwt/src/{parse,verify,sign}.ts`: SD-JWT VC parse + verify (against issuer JWKS over HTTP) + sign helpers.
+- [X] T101 [US2] Implement `apps/platform/app/api/verifier/request/route.ts`: POST creates a presentation request (kind ∈ `{pid, bar}`); stores the signed JWS request object (with `typ=oauth-authz-req+jwt` and `x5c` header chain); returns the HTTPS handoff URL `https://demo.wwwallet.org/cb?client_id=...&request_uri=...`.
+- [X] T102 [P] [US2] Implement `apps/platform/app/api/verifier/request/[state]/object/route.ts`: GET returns the signed JWS request object.
+- [X] T103 [US2] Implement `apps/platform/app/api/verifier/response/[state]/route.ts`: POST receives `vp_token` (parses BOTH string and array shapes — wwWallet quirk). Verifies SD-JWT VC against issuer JWKS, holder binding (KB-JWT signed by `cnf.jwk`; binding key matches SIWE address), validity end-date. On success, writes the appropriate EAS attestation via `AttestationManager.attestVerifiedClient` or `attestVerifiedLawyer` from the operator key; persists `verified_users` row.
+- [X] T104 [P] [US2] Implement `apps/platform/app/api/verifier/result/[state]/route.ts`: polled by browser; returns 200 + verified attribute subset, 202 (pending), or 4xx with reason.
 
 ### Platform side (lawyer onboarding flow + profile editor)
 
-- [ ] T105 [US2] Implement `apps/platform/app/connect/page.tsx`: role chooser (client / lawyer). Honors `?returnTo=` for post-onboarding redirects.
-- [ ] T106 [US2] Implement `apps/platform/app/connect/lawyer-stepper.tsx`: three-stage stepper (Authenticate → Verify identity → Verify profession) per [design/pages.md §4](../../design/pages.md). Uses HTTPS handoff URLs (`target="wwwallet"` anchors); never surfaces native-scheme deep links.
-- [ ] T107 [US2] Implement `apps/platform/app/verify-lawyer/page.tsx`: post-onboarding profile-data form. Pre-fills credential-derived fields (read-only). Editable: city, headline, bio (≥ 40 chars), specialties multi-select, languages, jurisdictions, years experience, hourly rate, pricing kind, pricing headline, consultation rate 30 / 60, pricing items (when non-HOURLY), tags, availability, consultation type (FREE/PAID).
-- [ ] T108 [P] [US2] Implement `apps/platform/app/verify-lawyer/verify-lawyer-form.tsx`: zod-validated form; rejects unknown fields server-side (FR-046).
-- [ ] T109 [US2] Implement `apps/platform/app/api/lawyer/profile/route.ts`: PATCH endpoint. Server re-checks `hasCapability(walletAddress, SCHEMA_LAWYER)` before persisting (FR-006-style ownership). zod schema rejects credential-derived fields.
-- [ ] T110 [P] [US2] Add Playwright E2E `apps/platform/__tests__/us2-lawyer-onboarding.spec.ts`: full lawyer onboarding via dev-bypass `POST /api/dev/login` (writes both EAS attestations + lawyer_profiles fixture row); verify the lawyer appears in `/lawyers`.
+- [X] T105 [US2] Implement `apps/platform/app/connect/page.tsx`: role chooser (client / lawyer). Honors `?returnTo=` for post-onboarding redirects.
+- [X] T106 [US2] Implement `apps/platform/app/connect/lawyer-stepper.tsx`: three-stage stepper (Authenticate → Verify identity → Verify profession) per [design/pages.md §4](../../design/pages.md). Uses HTTPS handoff URLs (`target="wwwallet"` anchors); never surfaces native-scheme deep links.
+- [X] T107 [US2] Implement `apps/platform/app/verify-lawyer/page.tsx`: post-onboarding profile-data form. Pre-fills credential-derived fields (read-only). Editable: city, headline, bio (≥ 40 chars), specialties multi-select, languages, jurisdictions, years experience, hourly rate, pricing kind, pricing headline, consultation rate 30 / 60, pricing items (when non-HOURLY), tags, availability, consultation type (FREE/PAID).
+- [X] T108 [P] [US2] Implement `apps/platform/app/verify-lawyer/verify-lawyer-form.tsx`: zod-validated form; rejects unknown fields server-side (FR-046).
+- [X] T109 [US2] Implement `apps/platform/app/api/lawyer/profile/route.ts`: PATCH endpoint. Server re-checks `hasCapability(walletAddress, SCHEMA_LAWYER)` before persisting (FR-006-style ownership). zod schema rejects credential-derived fields.
+- [X] T110 [P] [US2] Add Playwright E2E `apps/platform/__tests__/us2-lawyer-onboarding.spec.ts`: full lawyer onboarding via dev-bypass `POST /api/dev/login` (writes both EAS attestations + lawyer_profiles fixture row); verify the lawyer appears in `/lawyers`.
 
 **Checkpoint**: lawyers can fully self-onboard. Combined with US1, the directory is no longer empty.
 
@@ -222,16 +222,16 @@ This is a pnpm-workspace monorepo with three runtime processes:
 
 **Independent Test**: as a client wallet holding a freshly-minted PID, complete connect → SIWE → present PID → land at `/client/home` → pick a lawyer → submit consultation request with date / duration / practice area / case description ≥ 20 chars. For PAID, sign one funding transaction. Land in the consultation workspace; the engagement and conversation rows exist.
 
-- [ ] T111 [US3] Implement `apps/platform/app/connect/client-stepper.tsx`: two-stage stepper (Authenticate → Verify identity). Honors `?returnTo=`.
-- [ ] T112 [P] [US3] Implement `apps/platform/app/(client)/layout.tsx`: client-role chrome and `requireClient()` server-side check.
-- [ ] T113 [US3] Implement `apps/platform/app/(client)/home/page.tsx`: greeting + practice-area categories (8 canonical) + Active consultation card (if any) + recommended-lawyers grid.
-- [ ] T114 [US3] Implement `apps/platform/app/(client)/book/[lawyerId]/page.tsx`: booking form. Snapshots the lawyer's `consultation_kind` (FREE / PAID). For PAID, displays the rate.
-- [ ] T115 [P] [US3] Implement `apps/platform/app/(client)/book/[lawyerId]/booking-form.tsx`: zod-validated; date/time picker, duration radio (30 / 60), practice area picker, case description ≥ 20 chars, fee summary panel.
-- [ ] T116 [US3] Implement `apps/platform/app/api/consultations/route.ts`: POST creates the consultation + engagement records. For PAID, builds calldata for `openPaidEngagementAndFundConsultation` and returns it for the wallet to broadcast. For FREE, builds calldata for `openFreeEngagement` (zero ETH) for the wallet to sign.
-- [ ] T117 [P] [US3] Implement `apps/platform/app/api/consultations/[id]/route.ts`: GET reads one consultation including the paired engagement and conversation. Auth-gated to engagement parties.
-- [ ] T118 [US3] On successful tx confirmation (indexer hears `EngagementOpened`), the platform creates the `conversations` row and inserts the matter description into `engagements_off_chain.matter_description`.
-- [ ] T119 [P] [US3] Add chain-health gate (`/api/chain-health`) to the booking-form Confirm button: disable + show `<ChainUnavailableBanner>` when the chain is unreachable (FR-060).
-- [ ] T120 [P] [US3] Add Playwright E2E `apps/platform/__tests__/us3-client-booking.spec.ts`: dev-bypass login as client; book paid + free consultation; verify both engagement rows exist; verify the PAID one has a non-null `escrow_funding_tx_hash`.
+- [X] T111 [US3] Implement `apps/platform/app/connect/client-stepper.tsx`: two-stage stepper (Authenticate → Verify identity). Honors `?returnTo=`.
+- [X] T112 [P] [US3] Implement `apps/platform/app/(client)/layout.tsx`: client-role chrome and `requireClient()` server-side check.
+- [X] T113 [US3] Implement `apps/platform/app/(client)/home/page.tsx`: greeting + practice-area categories (8 canonical) + Active consultation card (if any) + recommended-lawyers grid.
+- [X] T114 [US3] Implement `apps/platform/app/(client)/book/[lawyerId]/page.tsx`: booking form. Snapshots the lawyer's `consultation_kind` (FREE / PAID). For PAID, displays the rate.
+- [X] T115 [P] [US3] Implement `apps/platform/app/(client)/book/[lawyerId]/booking-form.tsx`: zod-validated; date/time picker, duration radio (30 / 60), practice area picker, case description ≥ 20 chars, fee summary panel.
+- [X] T116 [US3] Implement `apps/platform/app/api/consultations/route.ts`: POST creates the consultation + engagement records. For PAID, builds calldata for `openPaidEngagementAndFundConsultation` and returns it for the wallet to broadcast. For FREE, builds calldata for `openFreeEngagement` (zero ETH) for the wallet to sign.
+- [X] T117 [P] [US3] Implement `apps/platform/app/api/consultations/[id]/route.ts`: GET reads one consultation including the paired engagement and conversation. Auth-gated to engagement parties.
+- [X] T118 [US3] On successful tx confirmation (indexer hears `EngagementOpened`), the platform creates the `conversations` row and inserts the matter description into `engagements_off_chain.matter_description`.
+- [X] T119 [P] [US3] Add chain-health gate (`/api/chain-health`) to the booking-form Confirm button: disable + show `<ChainUnavailableBanner>` when the chain is unreachable (FR-060).
+- [X] T120 [P] [US3] Add Playwright E2E `apps/platform/__tests__/us3-client-booking.spec.ts`: dev-bypass login as client; book paid + free consultation; verify both engagement rows exist; verify the PAID one has a non-null `escrow_funding_tx_hash`.
 
 **Checkpoint**: clients can fully self-onboard and create engagements. The on-chain escrow holds parked funds for PAID consultations.
 
@@ -243,15 +243,15 @@ This is a pnpm-workspace monorepo with three runtime processes:
 
 **Independent Test**: as a lawyer with one pending REQUESTED consultation, open `/lawyer/dashboard`, see the request in the recent-requests panel showing `anon-XXXX`, click into `/lawyer/requests/[id]`, click Accept; verify the consultation status flips to ACCEPTED.
 
-- [ ] T121 [P] [US4] Implement `apps/platform/app/(lawyer)/layout.tsx`: lawyer-role chrome and `requireLawyer()` server-side check.
-- [ ] T122 [US4] Implement `apps/platform/app/(lawyer)/dashboard/page.tsx`: minimal dashboard for US4 (full version in US8). Shows pending-requests count + the recent-requests panel listing 5 most recent REQUESTED consultations.
-- [ ] T123 [US4] Implement `apps/platform/app/(lawyer)/requests/[id]/page.tsx`: request review page with anonymized client identifier, practice area, jurisdiction (DE), scheduled time, duration, case description, fee breakdown (consultation fee, platform fee, lawyer's net).
-- [ ] T124 [P] [US4] Implement `apps/platform/app/(lawyer)/requests/[id]/request-actions.tsx`: Accept and Decline buttons (teal primary + ghost).
-- [ ] T125 [US4] Implement `apps/platform/app/api/consultations/[id]/accept/route.ts`: POST verifies booking ownership (`booking.lawyer_profile.user_id === session.user.id`); off-chain transition REQUESTED → ACCEPTED.
-- [ ] T126 [US4] Implement `apps/platform/app/api/consultations/[id]/decline/route.ts`: POST verifies ownership; transitions to DECLINED. For PAID, initiates `MutualRefundAuthorization` flow (lawyer signs server-side stub for now; actual signing happens in the lawyer's wallet).
-- [ ] T127 [P] [US4] Implement `apps/platform/app/api/consultations/[id]/cancel/route.ts`: POST verifies client ownership; transitions to CANCELLED. For PAID, initiates the mutual-refund flow (FR-015b).
-- [ ] T128 [P] [US4] Implement `apps/platform/lib/db/consultations.ts` helper `expireStale()`: scheduled job (cron-style or per-request lazy) auto-transitions `status='REQUESTED'` rows whose `expires_at < now` to `EXPIRED`. For PAID, initiates mutual-refund flow (FR-015a).
-- [ ] T129 [P] [US4] Add Playwright E2E `apps/platform/__tests__/us4-accept-decline.spec.ts`: dev-bypass login as both personas; verify the anonymous identifier shows pre-accept; accept and confirm the dashboard's pending count drops.
+- [X] T121 [P] [US4] Implement `apps/platform/app/(lawyer)/layout.tsx`: lawyer-role chrome and `requireLawyer()` server-side check.
+- [X] T122 [US4] Implement `apps/platform/app/(lawyer)/dashboard/page.tsx`: minimal dashboard for US4 (full version in US8). Shows pending-requests count + the recent-requests panel listing 5 most recent REQUESTED consultations.
+- [X] T123 [US4] Implement `apps/platform/app/(lawyer)/requests/[id]/page.tsx`: request review page with anonymized client identifier, practice area, jurisdiction (DE), scheduled time, duration, case description, fee breakdown (consultation fee, platform fee, lawyer's net).
+- [X] T124 [P] [US4] Implement `apps/platform/app/(lawyer)/requests/[id]/request-actions.tsx`: Accept and Decline buttons (teal primary + ghost).
+- [X] T125 [US4] Implement `apps/platform/app/api/consultations/[id]/accept/route.ts`: POST verifies booking ownership (`booking.lawyer_profile.user_id === session.user.id`); off-chain transition REQUESTED → ACCEPTED.
+- [X] T126 [US4] Implement `apps/platform/app/api/consultations/[id]/decline/route.ts`: POST verifies ownership; transitions to DECLINED. For PAID, initiates `MutualRefundAuthorization` flow (lawyer signs server-side stub for now; actual signing happens in the lawyer's wallet).
+- [X] T127 [P] [US4] Implement `apps/platform/app/api/consultations/[id]/cancel/route.ts`: POST verifies client ownership; transitions to CANCELLED. For PAID, initiates the mutual-refund flow (FR-015b).
+- [X] T128 [P] [US4] Implement `apps/platform/lib/db/consultations.ts` helper `expireStale()`: scheduled job (cron-style or per-request lazy) auto-transitions `status='REQUESTED'` rows whose `expires_at < now` to `EXPIRED`. For PAID, initiates mutual-refund flow (FR-015a).
+- [X] T129 [P] [US4] Add Playwright E2E `apps/platform/__tests__/us4-accept-decline.spec.ts`: dev-bypass login as both personas; verify the anonymous identifier shows pre-accept; accept and confirm the dashboard's pending count drops.
 
 **Checkpoint**: the lawyer side of the supply funnel is complete. End-to-end happy path now requires only the consultation room to ship.
 
@@ -263,16 +263,16 @@ This is a pnpm-workspace monorepo with three runtime processes:
 
 **Independent Test**: with an accepted PAID consultation, open `/client/consultation/[id]` and `/lawyer/consultation/[id]`; send a chat message from one side, see it within 5 s on the other; click Mark Complete from the client side; sign one tx; verify `ProposalReleased` and `TranscriptAnchored` events fire and the consultation status flips to COMPLETED.
 
-- [ ] T130 [US5] Generate per-engagement P-256 keypair on first onboarding (client + lawyer): generated by `packages/crypto/src/ecdh.ts` in the browser; private half persisted to wallet-managed storage; public half registered via PATCH to `verified_users.message_pubkey`.
-- [ ] T131 [P] [US5] Implement `apps/platform/components/firmus/consultation-room.tsx`: dark-mode (`bg-navy-950`) shared workspace with video stub canvas, four controls (mute / camera / screen-share / hang-up — keyboard-reachable), chat panel on right, proposals panel on left, booking metadata strip top.
-- [ ] T132 [US5] Implement `apps/platform/app/(client)/consultation/[bookingId]/page.tsx` and `apps/platform/app/(lawyer)/consultation/[bookingId]/page.tsx`: thin wrappers around `consultation-room.tsx`. Server-side ownership check 404 on mismatch.
-- [ ] T133 [US5] Implement `apps/platform/app/api/messages/route.ts`: POST accepts ONLY `{conversationId, ciphertext_b64, iv_b64, salt_b64, signature, sender}` (zod schema rejects `plaintext`). Verifies signature against `sender`'s address. Verifies sender is a participant. Inserts ciphertext into `messages` with `transcript_leaf_hash`. GET `?conversationId=...` returns ciphertext envelopes.
-- [ ] T134 [P] [US5] Implement `apps/platform/components/firmus/chat-panel.tsx`: 5-second polling; client-side decrypt via ECDH-derived AES-GCM keys. Shows "Connect your wallet to view this conversation" when keys are unavailable (FR-040).
-- [ ] T135 [US5] Implement `apps/platform/components/firmus/proposals-panel.tsx`: per-proposal pill (state + ETH amount); action buttons keyed off state and role. For US5, only "Mark Complete" (client) is wired; other buttons reserved for US6+.
-- [ ] T136 [US5] Implement `apps/platform/app/api/consultations/[id]/complete/route.ts`: returns calldata for `releaseProposal(engagementId, 0)`. Idempotent on already-COMPLETED.
-- [ ] T137 [P] [US5] Indexer wires `ProposalReleased` for proposalIndex=0 → consultation status COMPLETED + `escrow_release_tx_hash`. `TranscriptAnchored` updates `engagements_off_chain.last_anchor_block`.
-- [ ] T138 [P] [US5] Add Playwright E2E `apps/platform/__tests__/us5-consultation.spec.ts`: dev-bypass logins for both personas; send a message; verify it appears on the other side within 6 s; mark complete; verify status COMPLETED on both sides.
-- [ ] T139 [P] [US5] Add vitest unit test `apps/platform/__tests__/messages-api.spec.ts`: server rejects POST with a `plaintext` field; server rejects POST from non-participant; server verifies signature mismatch.
+- [X] T130 [US5] Generate per-engagement P-256 keypair on first onboarding (client + lawyer): generated by `packages/crypto/src/ecdh.ts` in the browser; private half persisted to wallet-managed storage; public half registered via PATCH to `verified_users.message_pubkey`.
+- [X] T131 [P] [US5] Implement `apps/platform/components/firmus/consultation-room.tsx`: dark-mode (`bg-navy-950`) shared workspace with video stub canvas, four controls (mute / camera / screen-share / hang-up — keyboard-reachable), chat panel on right, proposals panel on left, booking metadata strip top.
+- [X] T132 [US5] Implement `apps/platform/app/(client)/consultation/[bookingId]/page.tsx` and `apps/platform/app/(lawyer)/consultation/[bookingId]/page.tsx`: thin wrappers around `consultation-room.tsx`. Server-side ownership check 404 on mismatch.
+- [X] T133 [US5] Implement `apps/platform/app/api/messages/route.ts`: POST accepts ONLY `{conversationId, ciphertext_b64, iv_b64, salt_b64, signature, sender}` (zod schema rejects `plaintext`). Verifies signature against `sender`'s address. Verifies sender is a participant. Inserts ciphertext into `messages` with `transcript_leaf_hash`. GET `?conversationId=...` returns ciphertext envelopes.
+- [X] T134 [P] [US5] Implement `apps/platform/components/firmus/chat-panel.tsx`: 5-second polling; client-side decrypt via ECDH-derived AES-GCM keys. Shows "Connect your wallet to view this conversation" when keys are unavailable (FR-040).
+- [X] T135 [US5] Implement `apps/platform/components/firmus/proposals-panel.tsx`: per-proposal pill (state + ETH amount); action buttons keyed off state and role. For US5, only "Mark Complete" (client) is wired; other buttons reserved for US6+.
+- [X] T136 [US5] Implement `apps/platform/app/api/consultations/[id]/complete/route.ts`: returns calldata for `releaseProposal(engagementId, 0)`. Idempotent on already-COMPLETED.
+- [X] T137 [P] [US5] Indexer wires `ProposalReleased` for proposalIndex=0 → consultation status COMPLETED + `escrow_release_tx_hash`. `TranscriptAnchored` updates `engagements_off_chain.last_anchor_block`.
+- [X] T138 [P] [US5] Add Playwright E2E `apps/platform/__tests__/us5-consultation.spec.ts`: dev-bypass logins for both personas; send a message; verify it appears on the other side within 6 s; mark complete; verify status COMPLETED on both sides.
+- [X] T139 [P] [US5] Add vitest unit test `apps/platform/__tests__/messages-api.spec.ts`: server rejects POST with a `plaintext` field; server rejects POST from non-participant; server verifies signature mismatch.
 
 **Checkpoint**: the full happy-path MVP slice (US1+US2+US3+US4+US5) ships. A demo can run end-to-end.
 
