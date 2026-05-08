@@ -20,6 +20,8 @@ SCENARIOS=(
   s13-stress-multi-engagement
   s14-unicode-messages
   s15-direct-chain-tampering
+  s16-large-payloads
+  s17-many-proposals
 )
 
 PASS=0
