@@ -13,31 +13,68 @@ cannot decrypt messages, unseal client identity, or forge a credential.
 
 ## Status
 
-MVP slice (US1–US5 + US7) is implemented and verified end-to-end on
-local Anvil:
+MVP slice (US1–US7) is implemented and verified end-to-end on local
+Anvil. Test pyramid:
 
-- `forge test` — 23/23 contract tests pass (asymmetric mechanism,
-  capability gates, full proposal lifecycle, mutual refund,
+- **Foundry** — 23/23 Solidity tests (asymmetric mechanism boundary
+  cases, capability gates, full proposal lifecycle, mutual refund,
   sum-equality split, concurrent-transition revert).
-- `scripts/smoke-test.sh` — full demo flow: 6 personas seeded with
-  EAS attestations on chain, paid consultation booked + funded +
+- **Vitest** — 11/11 unit tests on the crypto package
+  (`@firmus-novus/crypto`): ECDH key-pair derivation + both-sides
+  shared-secret equality, AES-GCM round-trip with fresh IV/salt per
+  message + tamper detection + wrong-key rejection, depth-16
+  incremental Merkle determinism + order-dependence.
+- **Scenario suite** — 20/20 end-to-end scenarios at
+  [`scripts/scenarios/`](scripts/scenarios/), runnable via
+  `bash scripts/scenarios/run-all.sh`. Coverage:
+  - S1 — FREE consultation (no on-chain release)
+  - S2 — client cancels PAID, mutual refund
+  - S3 — lawyer declines PAID, mutual refund
+  - S4 — lawyer escalation (anvil-time-skip 30 days)
+  - S5 — message-API security (plaintext rejected, non-participant
+        blocked, no plaintext column)
+  - S6 — chain-as-arbiter under parallel race
+  - S7 — role-gating (404-on-mismatch)
+  - S8 / S8b — multi-proposal lifecycle + forged-offer rejection
+  - S9 — input validation across mutating routes
+  - S10 — terminal-state guards + nullifier replay
+  - S11 — engagement closure
+  - S12 — FREE consultation + PAID follow-up
+  - S13 — 10 simultaneous engagements between same parties
+  - S14 — Unicode + 100KB ciphertext round-trip
+  - S15 — direct-chain tampering (every contract gate holds)
+  - S16 — large payloads (4KB description + 100KB ciphertext)
+  - S17 — 8 follow-up proposals on one engagement
+  - S18 — SSR render coverage + role-aware status banners
+  - S19 — operator revokes capability mid-flow + indexer mirrors
+- **Smoke test** — end-to-end demo: 6 personas seeded with EAS
+  attestations on chain, paid consultation booked + funded +
   accepted + completed, then a separate consultation disputed +
   resolved 50/50 by the operator.
+- **CI gates** — no-server-decryption, feature-isolation,
+  brand-mentions all green.
+- **Typecheck** — strict TS clean across the workspace.
 
-What's wired:
+What's wired in the UI:
 
 - Marketing landing + verified-lawyer directory + lawyer profile
   with live `hasCapability` check.
 - `/connect` role chooser; dev-bypass persona picker at
   `/dev/personas` (writes EAS attestations from operator key).
 - Client booking flow that broadcasts
-  `openPaidEngagementAndFundConsultation` /  `openFreeEngagement`.
-- Lawyer dashboard, request review, accept / decline.
+  `openPaidEngagementAndFundConsultation` / `openFreeEngagement`.
+- Lawyer dashboard with stat cards, recent requests, active
+  engagements (one-click "New proposal"), and an Active-disputes
+  warning card.
 - Consultation room: dark-mode workspace with E2EE chat
   (per-engagement P-256 ECDH + AES-GCM-256 in the browser),
-  proposals panel, mark-complete that broadcasts `releaseProposal`.
-- Operator dispute queue + resolve form that broadcasts
-  `resolveDispute(toLawyer, toClient)` with sum-equality.
+  proposals panel with role-keyed action buttons (accept-and-fund,
+  mark-delivered, release, dispute, escalate, mark-complete), and
+  status banners for REQUESTED / DECLINED / CANCELLED / COMPLETED.
+- Operator dispute queue + resolve form (sum-equality client-side
+  validation matching the contract require).
+- Lawyer "issue follow-up proposal" form with line items +
+  deliverables + 5% platform-fee preview.
 
 What's stubbed for the wwWallet integration session:
 
@@ -46,8 +83,7 @@ What's stubbed for the wwWallet integration session:
   the full wwWallet handshake is exercised via `DEV_BYPASS_EUDI=1`
   for now. Tomorrow's session pairs the `/connect` steppers with
   the live wwWallet.
-- US6 multi-proposal UI and US8 avatar upload UI are pending; the
-  contract surface and DB schema for both already work.
+- US8 avatar upload UI; the contract surface and DB schema work.
 
 ## Layout
 
