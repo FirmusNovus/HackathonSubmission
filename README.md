@@ -13,10 +13,41 @@ cannot decrypt messages, unseal client identity, or forge a credential.
 
 ## Status
 
-Currently spec-complete; implementation has not begun. The full
-specification (constitution + plan + research + data model + contract
-surfaces + quickstart + 178 numbered tasks) lives under
-[`specs/001-verified-legal-engagement/`](specs/001-verified-legal-engagement/).
+MVP slice (US1–US5 + US7) is implemented and verified end-to-end on
+local Anvil:
+
+- `forge test` — 23/23 contract tests pass (asymmetric mechanism,
+  capability gates, full proposal lifecycle, mutual refund,
+  sum-equality split, concurrent-transition revert).
+- `scripts/smoke-test.sh` — full demo flow: 6 personas seeded with
+  EAS attestations on chain, paid consultation booked + funded +
+  accepted + completed, then a separate consultation disputed +
+  resolved 50/50 by the operator.
+
+What's wired:
+
+- Marketing landing + verified-lawyer directory + lawyer profile
+  with live `hasCapability` check.
+- `/connect` role chooser; dev-bypass persona picker at
+  `/dev/personas` (writes EAS attestations from operator key).
+- Client booking flow that broadcasts
+  `openPaidEngagementAndFundConsultation` /  `openFreeEngagement`.
+- Lawyer dashboard, request review, accept / decline.
+- Consultation room: dark-mode workspace with E2EE chat
+  (per-engagement P-256 ECDH + AES-GCM-256 in the browser),
+  proposals panel, mark-complete that broadcasts `releaseProposal`.
+- Operator dispute queue + resolve form that broadcasts
+  `resolveDispute(toLawyer, toClient)` with sum-equality.
+
+What's stubbed for the wwWallet integration session:
+
+- The OID4VCI/OID4VP wire shapes (issuer `.well-known` endpoints,
+  verifier request/response routes) are scaffolded in the spec but
+  the full wwWallet handshake is exercised via `DEV_BYPASS_EUDI=1`
+  for now. Tomorrow's session pairs the `/connect` steppers with
+  the live wwWallet.
+- US6 multi-proposal UI and US8 avatar upload UI are pending; the
+  contract surface and DB schema for both already work.
 
 ## Layout
 
@@ -70,6 +101,33 @@ the workspace will grow:
 └── pnpm-workspace.yaml
 ```
 
+## Bring-up (local)
+
+```bash
+# 1. Install
+pnpm install
+
+# 2. Bring up the chain + deploy contracts + seed
+cp .env.example .env             # then edit .env if needed
+set -a; source .env; set +a
+anvil --block-time 2 --accounts 10 --balance 100 \
+      --gas-price 0 --base-fee 0 \
+      --mnemonic "$ANVIL_MNEMONIC" &
+bash scripts/deploy.sh
+
+# 3. Run the apps (proxy on 3000 fronts platform on 3010 + issuer on 3001)
+pnpm dev
+
+# 4. (Optional) front the proxy with ngrok for wwWallet access
+ngrok http --domain=$(echo $PUBLIC_HOSTNAME | sed 's|https://||') 3000
+
+# 5. Demo flow — open the browser, hit /dev/personas, pick "Demo Client",
+#    book a consultation with Anna Schmidt, switch persona to Anna and
+#    accept, switch back to client and mark complete.
+#    Or run the headless smoke test:
+bash scripts/smoke-test.sh
+```
+
 ## How to use this from Claude Code
 
 1. From inside this directory, start Claude Code.
@@ -82,9 +140,6 @@ the workspace will grow:
    the tech stack, project structure, and constitution-check table.
 5. Read [the quickstart](specs/001-verified-legal-engagement/quickstart.md)
    for the 10-minute bring-up flow.
-6. Run `/speckit-implement` to begin executing tasks; or pick the
-   first foundational task (`T019` — implement `AttestationManager.sol`)
-   and work down the list.
 
 ## Specification workflow used
 

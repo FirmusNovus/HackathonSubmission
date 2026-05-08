@@ -47,8 +47,8 @@ This is a pnpm-workspace monorepo with three runtime processes:
 - [X] T012 [P] Install `jose`, `siwe@2`, `better-sqlite3`, `zod` in `apps/issuer/`.
 - [X] T013 [P] Install `@ethereum-attestation-service/eas-sdk` in `apps/platform/`.
 - [X] T014 Add `madge` and `dependency-cruiser` as workspace dev-deps for the modularity gate (Constitution Inv 7).
-- [X] T015 [P] Set up Playwright in `apps/platform/` (`playwright.config.ts`); browsers via `pnpm exec playwright install chromium firefox`.
-- [X] T016 [P] Set up vitest in `apps/platform/` (`vitest.config.ts`) plus `@vitest/web-worker` for crypto-path unit tests.
+- [ ] T015 [P] Set up Playwright in `apps/platform/` (`playwright.config.ts`); browsers via `pnpm exec playwright install chromium firefox`.
+- [ ] T016 [P] Set up vitest in `apps/platform/` (`vitest.config.ts`) plus `@vitest/web-worker` for crypto-path unit tests.
 - [X] T017 Create `.env.example` at the repo root listing every env var the workspace consumes (DATABASE paths, OPERATOR_PRIVATE_KEY, NEXT_PUBLIC_RPC_URL, NEXT_PUBLIC_CHAIN_ID, NGROK_HOSTNAME, PUBLIC_URL, DEV_BYPASS_EUDI). Document which are dev-only.
 - [X] T018 [P] Add `.gitignore` lines for `apps/*/data/`, `apps/*/.next/`, `node_modules/`, `dist/`, `cache/`, `out/`, `broadcast/`, `circuits/target/`.
 
@@ -92,9 +92,9 @@ This is a pnpm-workspace monorepo with three runtime processes:
 
 ### Issuer SQLite schema + seed
 
-- [X] T040 Create `apps/issuer/lib/db/schema.ts`: `subjects`, `issuer_pre_auth_codes`, `issuer_access_tokens`, `credential_offers` tables per [data-model.md](./data-model.md#issuer-db--subjects). Migration runs on app boot.
-- [X] T041 Implement `apps/issuer/scripts/seed.ts`: populates `subjects` with five lawyers (anvil indices 1–5, both PID + bar rows) and one client (anvil index 6, PID only). Owner spec: 001.
-- [X] T042 Implement `apps/issuer/lib/keys.ts`: at first boot, generate `pid-signing-key.jwk` and `bar-signing-key.jwk` as ES256 P-256 JWKs at `apps/issuer/data/`. Idempotent: skips if files exist.
+- [ ] T040 Create `apps/issuer/lib/db/schema.ts`: `subjects`, `issuer_pre_auth_codes`, `issuer_access_tokens`, `credential_offers` tables per [data-model.md](./data-model.md#issuer-db--subjects). Migration runs on app boot.
+- [ ] T041 Implement `apps/issuer/scripts/seed.ts`: populates `subjects` with five lawyers (anvil indices 1–5, both PID + bar rows) and one client (anvil index 6, PID only). Owner spec: 001.
+- [ ] T042 Implement `apps/issuer/lib/keys.ts`: at first boot, generate `pid-signing-key.jwk` and `bar-signing-key.jwk` as ES256 P-256 JWKs at `apps/issuer/data/`. Idempotent: skips if files exist.
 
 ### Platform SQLite schema
 
@@ -143,11 +143,11 @@ This is a pnpm-workspace monorepo with three runtime processes:
 
 ### CI invariant gates
 
-- [X] T073 Create `scripts/check-isolation.sh`: starts the issuer alone, posts a credential offer, then starts the platform alone, verifies the platform can fetch the issuer's `.well-known/jwks.json` over HTTP. Exits non-zero on failure.
+- [ ] T073 Create `scripts/check-isolation.sh`: starts the issuer alone, posts a credential offer, then starts the platform alone, verifies the platform can fetch the issuer's `.well-known/jwks.json` over HTTP. Exits non-zero on failure.
 - [X] T074 [P] Create `scripts/check-feature-isolation.sh`: greps `apps/platform/app/(client|lawyer|operator)/**` for cross-feature imports between siblings; exits non-zero on any direct sibling-feature import.
 - [X] T075 [P] Create `scripts/check-brand-mentions.sh`: confirms exactly one mention of the public brand name in spec / plan title lines, zero mentions in spec body, zero mentions of the alternative names from prior drafts in the entire repo.
 - [X] T076 [P] Create `scripts/check-no-server-decryption.sh`: greps `apps/platform/lib/` (excluding `lib/crypto/client/` and `lib/dev/`) for AES-GCM-decrypt or ECDH-derive imports; exits non-zero on any match (Constitution Inv 1).
-- [X] T077 [P] Add `.github/workflows/ci.yml` running: `forge test`, `pnpm test` (vitest), `pnpm madge --circular apps/platform/`, `scripts/check-feature-isolation.sh`, `scripts/check-brand-mentions.sh`, `scripts/check-no-server-decryption.sh`, `scripts/check-isolation.sh`.
+- [ ] T077 [P] Add `.github/workflows/ci.yml` running: `forge test`, `pnpm test` (vitest), `pnpm madge --circular apps/platform/`, `scripts/check-feature-isolation.sh`, `scripts/check-brand-mentions.sh`, `scripts/check-no-server-decryption.sh`, `scripts/check-isolation.sh`.
 
 **Checkpoint**: foundation ready — user story implementation can now begin in parallel.
 
@@ -169,7 +169,7 @@ This is a pnpm-workspace monorepo with three runtime processes:
 - [X] T085 [US1] Implement `apps/platform/app/api/lawyers/[id]/route.ts`: GET handler returning the LawyerDirectoryRow shape per [spec.md Key Entities](./spec.md#key-entities). 404 if attestation revoked/expired/missing.
 - [X] T086 [P] [US1] Add live `hasCapability` check on the EBSI badge click (calls `viem.readContract(AttestationManager.hasCapability)`); displays the UID + chain-explorer link.
 - [X] T087 [P] [US1] Add `LawyerCard` empty-state for the zero-results filter case ("No matching counsel. Try removing a filter." with `Clear filters` CTA).
-- [X] T088 [P] [US1] Add Playwright E2E `apps/platform/__tests__/us1-discovery.spec.ts`: load `/`, scroll, click `/lawyers`, apply a filter, click a card, verify profile renders. Uses `DEV_BYPASS_EUDI=1` to seed three verified lawyers via `/api/dev/login`.
+- [ ] T088 [P] [US1] Add Playwright E2E `apps/platform/__tests__/us1-discovery.spec.ts`: load `/`, scroll, click `/lawyers`, apply a filter, click a card, verify profile renders. Uses `DEV_BYPASS_EUDI=1` to seed three verified lawyers via `/api/dev/login`.
 
 **Checkpoint**: US1 ships an MVP discovery surface independently of any onboarding work.
 
@@ -183,34 +183,34 @@ This is a pnpm-workspace monorepo with three runtime processes:
 
 ### Issuer side (OID4VCI for both credential types)
 
-- [X] T089 [US2] Implement `apps/issuer/app/api/issuer/pid/.well-known/openid-credential-issuer/route.ts`: GET handler returning issuer metadata for `urn:eudi:pid:1`. Sends `Cache-Control: no-store`.
-- [X] T090 [P] [US2] Implement `apps/issuer/app/api/issuer/pid/.well-known/jwks.json/route.ts`: returns the PID public key from `pid-signing-key.jwk`.
-- [X] T091 [US2] Implement `apps/issuer/app/api/issuer/pid/credential-offer/route.ts`: POST creates a pre-auth code, stores the offer JSON at `credential_offer_uri`, returns the HTTPS handoff URL `https://demo.wwwallet.org/cb?credential_offer_uri=<encoded>`.
-- [X] T092 [P] [US2] Implement `apps/issuer/app/api/issuer/pid/token/route.ts`: OID4VCI token endpoint (pre-authorized code grant + DPoP).
-- [X] T093 [US2] Implement `apps/issuer/app/api/issuer/pid/credential/route.ts`: issues SD-JWT VC `urn:eudi:pid:1` signed with `pid-signing-key.jwk`. `iss` claim is the issuer's HTTPS hostname (NOT did:key).
-- [X] T094 [P] [US2] Mirror PID routes for the bar credential at `apps/issuer/app/api/issuer/bar/{.well-known/openid-credential-issuer,.well-known/jwks.json,credential-offer,token,credential}/route.ts`. Bar credential offer gates on `subjects WHERE eth_address=<wallet> AND credential_type='bar'`; 403 if not on the bar roster.
-- [X] T095 [US2] Implement `apps/issuer/app/(issuer)/page.tsx`: credential picker UI. Shows tiles for PID and bar; bar tile is greyed out when the SIWE-bound wallet is not on the bar roster.
-- [X] T096 [P] [US2] Add E2E test (vitest, against the live spike) verifying both credential issuances complete end-to-end.
+- [ ] T089 [US2] Implement `apps/issuer/app/api/issuer/pid/.well-known/openid-credential-issuer/route.ts`: GET handler returning issuer metadata for `urn:eudi:pid:1`. Sends `Cache-Control: no-store`.
+- [ ] T090 [P] [US2] Implement `apps/issuer/app/api/issuer/pid/.well-known/jwks.json/route.ts`: returns the PID public key from `pid-signing-key.jwk`.
+- [ ] T091 [US2] Implement `apps/issuer/app/api/issuer/pid/credential-offer/route.ts`: POST creates a pre-auth code, stores the offer JSON at `credential_offer_uri`, returns the HTTPS handoff URL `https://demo.wwwallet.org/cb?credential_offer_uri=<encoded>`.
+- [ ] T092 [P] [US2] Implement `apps/issuer/app/api/issuer/pid/token/route.ts`: OID4VCI token endpoint (pre-authorized code grant + DPoP).
+- [ ] T093 [US2] Implement `apps/issuer/app/api/issuer/pid/credential/route.ts`: issues SD-JWT VC `urn:eudi:pid:1` signed with `pid-signing-key.jwk`. `iss` claim is the issuer's HTTPS hostname (NOT did:key).
+- [ ] T094 [P] [US2] Mirror PID routes for the bar credential at `apps/issuer/app/api/issuer/bar/{.well-known/openid-credential-issuer,.well-known/jwks.json,credential-offer,token,credential}/route.ts`. Bar credential offer gates on `subjects WHERE eth_address=<wallet> AND credential_type='bar'`; 403 if not on the bar roster.
+- [ ] T095 [US2] Implement `apps/issuer/app/(issuer)/page.tsx`: credential picker UI. Shows tiles for PID and bar; bar tile is greyed out when the SIWE-bound wallet is not on the bar roster.
+- [ ] T096 [P] [US2] Add E2E test (vitest, against the live spike) verifying both credential issuances complete end-to-end.
 
 ### Platform side (OID4VP verifier)
 
-- [X] T097 [US2] Implement `apps/platform/lib/verifier/x509-cert.ts`: at boot, generate a self-signed RSA cert with CN = `process.env.NGROK_HOSTNAME`. Persist to `apps/platform/data/verifier-cert.pem`.
-- [X] T098 [US2] Implement `apps/platform/app/api/verifier/x509-cert.pem/route.ts`: serves the cert.
-- [X] T099 [P] [US2] Create `packages/dcql/src/builders.ts`: DCQL query builders for PID and bar presentations per [contracts/credential-shapes.md](./contracts/credential-shapes.md).
-- [X] T100 [P] [US2] Create `packages/sd-jwt/src/{parse,verify,sign}.ts`: SD-JWT VC parse + verify (against issuer JWKS over HTTP) + sign helpers.
-- [X] T101 [US2] Implement `apps/platform/app/api/verifier/request/route.ts`: POST creates a presentation request (kind ∈ `{pid, bar}`); stores the signed JWS request object (with `typ=oauth-authz-req+jwt` and `x5c` header chain); returns the HTTPS handoff URL `https://demo.wwwallet.org/cb?client_id=...&request_uri=...`.
-- [X] T102 [P] [US2] Implement `apps/platform/app/api/verifier/request/[state]/object/route.ts`: GET returns the signed JWS request object.
-- [X] T103 [US2] Implement `apps/platform/app/api/verifier/response/[state]/route.ts`: POST receives `vp_token` (parses BOTH string and array shapes — wwWallet quirk). Verifies SD-JWT VC against issuer JWKS, holder binding (KB-JWT signed by `cnf.jwk`; binding key matches SIWE address), validity end-date. On success, writes the appropriate EAS attestation via `AttestationManager.attestVerifiedClient` or `attestVerifiedLawyer` from the operator key; persists `verified_users` row.
-- [X] T104 [P] [US2] Implement `apps/platform/app/api/verifier/result/[state]/route.ts`: polled by browser; returns 200 + verified attribute subset, 202 (pending), or 4xx with reason.
+- [ ] T097 [US2] Implement `apps/platform/lib/verifier/x509-cert.ts`: at boot, generate a self-signed RSA cert with CN = `process.env.NGROK_HOSTNAME`. Persist to `apps/platform/data/verifier-cert.pem`.
+- [ ] T098 [US2] Implement `apps/platform/app/api/verifier/x509-cert.pem/route.ts`: serves the cert.
+- [ ] T099 [P] [US2] Create `packages/dcql/src/builders.ts`: DCQL query builders for PID and bar presentations per [contracts/credential-shapes.md](./contracts/credential-shapes.md).
+- [ ] T100 [P] [US2] Create `packages/sd-jwt/src/{parse,verify,sign}.ts`: SD-JWT VC parse + verify (against issuer JWKS over HTTP) + sign helpers.
+- [ ] T101 [US2] Implement `apps/platform/app/api/verifier/request/route.ts`: POST creates a presentation request (kind ∈ `{pid, bar}`); stores the signed JWS request object (with `typ=oauth-authz-req+jwt` and `x5c` header chain); returns the HTTPS handoff URL `https://demo.wwwallet.org/cb?client_id=...&request_uri=...`.
+- [ ] T102 [P] [US2] Implement `apps/platform/app/api/verifier/request/[state]/object/route.ts`: GET returns the signed JWS request object.
+- [ ] T103 [US2] Implement `apps/platform/app/api/verifier/response/[state]/route.ts`: POST receives `vp_token` (parses BOTH string and array shapes — wwWallet quirk). Verifies SD-JWT VC against issuer JWKS, holder binding (KB-JWT signed by `cnf.jwk`; binding key matches SIWE address), validity end-date. On success, writes the appropriate EAS attestation via `AttestationManager.attestVerifiedClient` or `attestVerifiedLawyer` from the operator key; persists `verified_users` row.
+- [ ] T104 [P] [US2] Implement `apps/platform/app/api/verifier/result/[state]/route.ts`: polled by browser; returns 200 + verified attribute subset, 202 (pending), or 4xx with reason.
 
 ### Platform side (lawyer onboarding flow + profile editor)
 
 - [X] T105 [US2] Implement `apps/platform/app/connect/page.tsx`: role chooser (client / lawyer). Honors `?returnTo=` for post-onboarding redirects.
-- [X] T106 [US2] Implement `apps/platform/app/connect/lawyer-stepper.tsx`: three-stage stepper (Authenticate → Verify identity → Verify profession) per [design/pages.md §4](../../design/pages.md). Uses HTTPS handoff URLs (`target="wwwallet"` anchors); never surfaces native-scheme deep links.
-- [X] T107 [US2] Implement `apps/platform/app/verify-lawyer/page.tsx`: post-onboarding profile-data form. Pre-fills credential-derived fields (read-only). Editable: city, headline, bio (≥ 40 chars), specialties multi-select, languages, jurisdictions, years experience, hourly rate, pricing kind, pricing headline, consultation rate 30 / 60, pricing items (when non-HOURLY), tags, availability, consultation type (FREE/PAID).
-- [X] T108 [P] [US2] Implement `apps/platform/app/verify-lawyer/verify-lawyer-form.tsx`: zod-validated form; rejects unknown fields server-side (FR-046).
-- [X] T109 [US2] Implement `apps/platform/app/api/lawyer/profile/route.ts`: PATCH endpoint. Server re-checks `hasCapability(walletAddress, SCHEMA_LAWYER)` before persisting (FR-006-style ownership). zod schema rejects credential-derived fields.
-- [X] T110 [P] [US2] Add Playwright E2E `apps/platform/__tests__/us2-lawyer-onboarding.spec.ts`: full lawyer onboarding via dev-bypass `POST /api/dev/login` (writes both EAS attestations + lawyer_profiles fixture row); verify the lawyer appears in `/lawyers`.
+- [ ] T106 [US2] Implement `apps/platform/app/connect/lawyer-stepper.tsx`: three-stage stepper (Authenticate → Verify identity → Verify profession) per [design/pages.md §4](../../design/pages.md). Uses HTTPS handoff URLs (`target="wwwallet"` anchors); never surfaces native-scheme deep links.
+- [ ] T107 [US2] Implement `apps/platform/app/verify-lawyer/page.tsx`: post-onboarding profile-data form. Pre-fills credential-derived fields (read-only). Editable: city, headline, bio (≥ 40 chars), specialties multi-select, languages, jurisdictions, years experience, hourly rate, pricing kind, pricing headline, consultation rate 30 / 60, pricing items (when non-HOURLY), tags, availability, consultation type (FREE/PAID).
+- [ ] T108 [P] [US2] Implement `apps/platform/app/verify-lawyer/verify-lawyer-form.tsx`: zod-validated form; rejects unknown fields server-side (FR-046).
+- [ ] T109 [US2] Implement `apps/platform/app/api/lawyer/profile/route.ts`: PATCH endpoint. Server re-checks `hasCapability(walletAddress, SCHEMA_LAWYER)` before persisting (FR-006-style ownership). zod schema rejects credential-derived fields.
+- [ ] T110 [P] [US2] Add Playwright E2E `apps/platform/__tests__/us2-lawyer-onboarding.spec.ts`: full lawyer onboarding via dev-bypass `POST /api/dev/login` (writes both EAS attestations + lawyer_profiles fixture row); verify the lawyer appears in `/lawyers`.
 
 **Checkpoint**: lawyers can fully self-onboard. Combined with US1, the directory is no longer empty.
 
@@ -231,7 +231,7 @@ This is a pnpm-workspace monorepo with three runtime processes:
 - [X] T117 [P] [US3] Implement `apps/platform/app/api/consultations/[id]/route.ts`: GET reads one consultation including the paired engagement and conversation. Auth-gated to engagement parties.
 - [X] T118 [US3] On successful tx confirmation (indexer hears `EngagementOpened`), the platform creates the `conversations` row and inserts the matter description into `engagements_off_chain.matter_description`.
 - [X] T119 [P] [US3] Add chain-health gate (`/api/chain-health`) to the booking-form Confirm button: disable + show `<ChainUnavailableBanner>` when the chain is unreachable (FR-060).
-- [X] T120 [P] [US3] Add Playwright E2E `apps/platform/__tests__/us3-client-booking.spec.ts`: dev-bypass login as client; book paid + free consultation; verify both engagement rows exist; verify the PAID one has a non-null `escrow_funding_tx_hash`.
+- [ ] T120 [P] [US3] Add Playwright E2E `apps/platform/__tests__/us3-client-booking.spec.ts`: dev-bypass login as client; book paid + free consultation; verify both engagement rows exist; verify the PAID one has a non-null `escrow_funding_tx_hash`.
 
 **Checkpoint**: clients can fully self-onboard and create engagements. The on-chain escrow holds parked funds for PAID consultations.
 
@@ -251,7 +251,7 @@ This is a pnpm-workspace monorepo with three runtime processes:
 - [X] T126 [US4] Implement `apps/platform/app/api/consultations/[id]/decline/route.ts`: POST verifies ownership; transitions to DECLINED. For PAID, initiates `MutualRefundAuthorization` flow (lawyer signs server-side stub for now; actual signing happens in the lawyer's wallet).
 - [X] T127 [P] [US4] Implement `apps/platform/app/api/consultations/[id]/cancel/route.ts`: POST verifies client ownership; transitions to CANCELLED. For PAID, initiates the mutual-refund flow (FR-015b).
 - [X] T128 [P] [US4] Implement `apps/platform/lib/db/consultations.ts` helper `expireStale()`: scheduled job (cron-style or per-request lazy) auto-transitions `status='REQUESTED'` rows whose `expires_at < now` to `EXPIRED`. For PAID, initiates mutual-refund flow (FR-015a).
-- [X] T129 [P] [US4] Add Playwright E2E `apps/platform/__tests__/us4-accept-decline.spec.ts`: dev-bypass login as both personas; verify the anonymous identifier shows pre-accept; accept and confirm the dashboard's pending count drops.
+- [ ] T129 [P] [US4] Add Playwright E2E `apps/platform/__tests__/us4-accept-decline.spec.ts`: dev-bypass login as both personas; verify the anonymous identifier shows pre-accept; accept and confirm the dashboard's pending count drops.
 
 **Checkpoint**: the lawyer side of the supply funnel is complete. End-to-end happy path now requires only the consultation room to ship.
 
@@ -271,8 +271,8 @@ This is a pnpm-workspace monorepo with three runtime processes:
 - [X] T135 [US5] Implement `apps/platform/components/firmus/proposals-panel.tsx`: per-proposal pill (state + ETH amount); action buttons keyed off state and role. For US5, only "Mark Complete" (client) is wired; other buttons reserved for US6+.
 - [X] T136 [US5] Implement `apps/platform/app/api/consultations/[id]/complete/route.ts`: returns calldata for `releaseProposal(engagementId, 0)`. Idempotent on already-COMPLETED.
 - [X] T137 [P] [US5] Indexer wires `ProposalReleased` for proposalIndex=0 → consultation status COMPLETED + `escrow_release_tx_hash`. `TranscriptAnchored` updates `engagements_off_chain.last_anchor_block`.
-- [X] T138 [P] [US5] Add Playwright E2E `apps/platform/__tests__/us5-consultation.spec.ts`: dev-bypass logins for both personas; send a message; verify it appears on the other side within 6 s; mark complete; verify status COMPLETED on both sides.
-- [X] T139 [P] [US5] Add vitest unit test `apps/platform/__tests__/messages-api.spec.ts`: server rejects POST with a `plaintext` field; server rejects POST from non-participant; server verifies signature mismatch.
+- [ ] T138 [P] [US5] Add Playwright E2E `apps/platform/__tests__/us5-consultation.spec.ts`: dev-bypass logins for both personas; send a message; verify it appears on the other side within 6 s; mark complete; verify status COMPLETED on both sides.
+- [ ] T139 [P] [US5] Add vitest unit test `apps/platform/__tests__/messages-api.spec.ts`: server rejects POST with a `plaintext` field; server rejects POST from non-participant; server verifies signature mismatch.
 
 **Checkpoint**: the full happy-path MVP slice (US1+US2+US3+US4+US5) ships. A demo can run end-to-end.
 
@@ -304,13 +304,13 @@ This is a pnpm-workspace monorepo with three runtime processes:
 
 **Independent Test**: produce a DISPUTED proposal (via either client-immediate dispute OR lawyer-cooldown-then-escalate); sign in as operator; open `/operator/disputes`; pick the row; enter a split that sums to the parked amount; sign resolve; verify funds move per the split.
 
-- [ ] T149 [US7] Implement `apps/platform/app/(operator)/layout.tsx`: gates `/operator/*` to `session.user.address === LegalEngagementEscrow.operator()`. 404 (not 403) on mismatch.
-- [ ] T150 [US7] Implement `apps/platform/app/(operator)/disputes/page.tsx`: queue table of all current `Disputed` proposals (engagement, proposal index, parked amount, filed by, filed at).
-- [ ] T151 [US7] Implement `apps/platform/app/(operator)/disputes/[engagementId]/[proposalIndex]/page.tsx`: detail view per spec US7 acceptance scenario 2. Resolution form (two ETH inputs with sum-equality client-side validation; explicit "Evidence section" line).
-- [ ] T152 [P] [US7] Implement `apps/platform/app/api/disputes/[engagementId]/[proposalIndex]/file/route.ts`: returns calldata for `disputeProposal(...)`. Client-only.
-- [ ] T153 [P] [US7] Implement `apps/platform/app/api/disputes/[engagementId]/[proposalIndex]/escalate/route.ts`: returns calldata for `escalateProposal(...)`. Lawyer-only. UI must show countdown until cooldown elapses.
-- [ ] T154 [P] [US7] Implement `apps/platform/app/api/operator/disputes/route.ts`: GET lists all disputed proposals; gated to operator address.
-- [ ] T155 [P] [US7] Implement `apps/platform/app/api/operator/disputes/[engagementId]/[proposalIndex]/resolve/route.ts`: returns calldata for `resolveDispute(...)`. The form pre-validates sum-equality before broadcast; the contract enforces too.
+- [X] T149 [US7] Implement `apps/platform/app/(operator)/layout.tsx`: gates `/operator/*` to `session.user.address === LegalEngagementEscrow.operator()`. 404 (not 403) on mismatch.
+- [X] T150 [US7] Implement `apps/platform/app/(operator)/disputes/page.tsx`: queue table of all current `Disputed` proposals (engagement, proposal index, parked amount, filed by, filed at).
+- [X] T151 [US7] Implement `apps/platform/app/(operator)/disputes/[engagementId]/[proposalIndex]/page.tsx`: detail view per spec US7 acceptance scenario 2. Resolution form (two ETH inputs with sum-equality client-side validation; explicit "Evidence section" line).
+- [X] T152 [P] [US7] Implement `apps/platform/app/api/disputes/[engagementId]/[proposalIndex]/file/route.ts`: returns calldata for `disputeProposal(...)`. Client-only.
+- [X] T153 [P] [US7] Implement `apps/platform/app/api/disputes/[engagementId]/[proposalIndex]/escalate/route.ts`: returns calldata for `escalateProposal(...)`. Lawyer-only. UI must show countdown until cooldown elapses.
+- [X] T154 [P] [US7] Implement `apps/platform/app/api/operator/disputes/route.ts`: GET lists all disputed proposals; gated to operator address.
+- [X] T155 [P] [US7] Implement `apps/platform/app/api/operator/disputes/[engagementId]/[proposalIndex]/resolve/route.ts`: returns calldata for `resolveDispute(...)`. The form pre-validates sum-equality before broadcast; the contract enforces too.
 - [ ] T156 [P] [US7] Indexer wires `ProposalDisputed`, `ProposalResolved` events → `disputes_off_chain` mirror updates.
 - [ ] T157 [P] [US7] Add Playwright E2E `apps/platform/__tests__/us7-dispute.spec.ts`: client-immediate dispute path; operator resolves with 50/50 split; assert funds moved. Lawyer-cooldown path uses `POST /api/dev/skip-time` to advance Anvil 30 days, then escalate, then resolve.
 
@@ -344,7 +344,7 @@ This is a pnpm-workspace monorepo with three runtime processes:
 - [ ] T166 [P] Implement `<ChainUnavailableBanner>` rendering on every funds-touching surface when `/api/chain-health` returns `healthy: false` (FR-060). Banner copy: "Secure payment network is temporarily unavailable — please try again in a moment."
 - [ ] T167 [P] Implement state-changed handler for tx-revert-due-to-stale-state: parse the contract revert reason; surface "state changed — please reload" instead of a generic failure (FR-059).
 - [ ] T168 [P] Add ARIA attributes + keyboard navigation tests across the consultation room, the role stepper, and the operator dispute detail (Constitution VI accessibility rule + spec SCs).
-- [ ] T169 [P] Add the persistent "Dev mode" banner component to the platform's root layout when `DEV_BYPASS_EUDI=1` (FR-D03). Gold pill, never dismissable.
+- [X] T169 [P] Add the persistent "Dev mode" banner component to the platform's root layout when `DEV_BYPASS_EUDI=1` (FR-D03). Gold pill, never dismissable.
 - [ ] T170 [P] Implement `scripts/deploy.sh`: orchestrates `forge script` deployment to local Anvil + writes `apps/platform/lib/chain/addresses.ts`.
 - [ ] T171 [P] Implement `scripts/seed.sh`: shells out to `apps/issuer/scripts/seed.ts`.
 - [ ] T172 [P] Implement `scripts/start-all.sh` and `scripts/start-all-ngrok.sh`: orchestrate Anvil + the three apps + (optionally) ngrok in one terminal.
