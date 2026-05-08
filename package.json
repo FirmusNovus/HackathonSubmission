@@ -1,0 +1,45 @@
+{
+  "name": "firmus-novus",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "anvil": "dotenv -e .env -- bash -c 'anvil --block-time 2 --accounts 10 --balance 100 --gas-price 0 --base-fee 0 ${ANVIL_MNEMONIC:+--mnemonic \"$ANVIL_MNEMONIC\"}'",
+    "dev": "dotenv -e .env -- concurrently -n proxy,platform,issuer -c blue,green,magenta \"pnpm -F @firmus-novus/proxy dev\" \"pnpm -F @firmus-novus/platform dev\" \"pnpm -F @firmus-novus/issuer dev\"",
+    "dev:platform": "dotenv -e .env -- pnpm -F @firmus-novus/platform dev",
+    "dev:issuer": "dotenv -e .env -- pnpm -F @firmus-novus/issuer dev",
+    "dev:proxy": "dotenv -e .env -- pnpm -F @firmus-novus/proxy dev",
+    "build": "pnpm -r --if-present build",
+    "test": "pnpm -r --if-present test",
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "deploy": "dotenv -e .env -- bash scripts/deploy.sh",
+    "seed": "dotenv -e .env -- bash scripts/seed.sh",
+    "reset": "rm -rf apps/platform/data apps/issuer/data apps/platform/lib/chain/addresses.ts && pnpm deploy && pnpm seed",
+    "start-all": "bash scripts/start-all.sh",
+    "ngrok": "ngrok http --domain=$(echo $PUBLIC_HOSTNAME | sed 's|https://||') 3000"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^20.17.10",
+    "concurrently": "^9.1.2",
+    "dependency-cruiser": "^16.5.0",
+    "dotenv-cli": "^8.0.0",
+    "eslint": "^8.57.1",
+    "madge": "^8.0.0",
+    "prettier": "^3.4.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "bufferutil",
+      "esbuild",
+      "keccak",
+      "secp256k1",
+      "sharp",
+      "unrs-resolver",
+      "utf-8-validate"
+    ]
+  }
+}

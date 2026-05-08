@@ -33,24 +33,24 @@ This is a pnpm-workspace monorepo with three runtime processes:
 
 **Purpose**: workspace + tooling so every other task can land cleanly.
 
-- [ ] T001 Initialize pnpm workspace at the repo root with `pnpm-workspace.yaml`, `package.json`, and `.npmrc`. List the four app/package directories.
-- [ ] T002 [P] Create the `apps/platform/`, `apps/issuer/`, `apps/proxy/` skeleton directories with stub `package.json` files referencing pnpm workspace deps.
-- [ ] T003 [P] Create `packages/{crypto,dcql,sd-jwt,oid4vci,db-toolkit}/` skeleton directories with stub `package.json` and `index.ts` exports.
-- [ ] T004 [P] Initialize Foundry at `contracts/` (`forge init --no-git`); add `foundry.toml` with `solc = "0.8.28"`, `optimizer = true`, `optimizer_runs = 200`.
-- [ ] T005 [P] Pin OpenZeppelin Contracts v5.2.0 in `contracts/foundry.toml` remappings; install via `forge install OpenZeppelin/openzeppelin-contracts@v5.2.0 --no-commit`.
-- [ ] T006 [P] Create `circuits/` skeleton with `Nargo.toml` and `src/main.nr` placeholder. Document under `circuits/README.md` that the Noir circuit is production trajectory only.
-- [ ] T007 Configure root TypeScript at `tsconfig.base.json` (strict mode, `target: "ES2022"`, `module: "ESNext"`, `moduleResolution: "bundler"`); each app extends with its own `tsconfig.json`.
-- [ ] T008 [P] Configure root ESLint at `.eslintrc.cjs` (Next.js + TypeScript strict + import-cycles plugin). Each app inherits.
-- [ ] T009 [P] Configure root Prettier at `.prettierrc.json` (2 spaces, single quotes, no trailing commas in JSON).
-- [ ] T010 Add Tailwind v3 to both `apps/platform/` and `apps/issuer/`; copy `design/css/tokens.css` into each app's `app/globals.css` as the `@theme` block.
-- [ ] T011 [P] Install `sharp`, `jose`, `siwe@2`, `wagmi@2`, `viem@2`, `better-sqlite3`, `zod`, `react-hook-form`, `@hookform/resolvers`, `lucide-react`, `class-variance-authority`, `tailwind-merge` in `apps/platform/`.
-- [ ] T012 [P] Install `jose`, `siwe@2`, `better-sqlite3`, `zod` in `apps/issuer/`.
-- [ ] T013 [P] Install `@ethereum-attestation-service/eas-sdk` in `apps/platform/`.
-- [ ] T014 Add `madge` and `dependency-cruiser` as workspace dev-deps for the modularity gate (Constitution Inv 7).
-- [ ] T015 [P] Set up Playwright in `apps/platform/` (`playwright.config.ts`); browsers via `pnpm exec playwright install chromium firefox`.
-- [ ] T016 [P] Set up vitest in `apps/platform/` (`vitest.config.ts`) plus `@vitest/web-worker` for crypto-path unit tests.
-- [ ] T017 Create `.env.example` at the repo root listing every env var the workspace consumes (DATABASE paths, OPERATOR_PRIVATE_KEY, NEXT_PUBLIC_RPC_URL, NEXT_PUBLIC_CHAIN_ID, NGROK_HOSTNAME, PUBLIC_URL, DEV_BYPASS_EUDI). Document which are dev-only.
-- [ ] T018 [P] Add `.gitignore` lines for `apps/*/data/`, `apps/*/.next/`, `node_modules/`, `dist/`, `cache/`, `out/`, `broadcast/`, `circuits/target/`.
+- [X] T001 Initialize pnpm workspace at the repo root with `pnpm-workspace.yaml`, `package.json`, and `.npmrc`. List the four app/package directories.
+- [X] T002 [P] Create the `apps/platform/`, `apps/issuer/`, `apps/proxy/` skeleton directories with stub `package.json` files referencing pnpm workspace deps.
+- [X] T003 [P] Create `packages/{crypto,dcql,sd-jwt,oid4vci,db-toolkit}/` skeleton directories with stub `package.json` and `index.ts` exports.
+- [X] T004 [P] Initialize Foundry at `contracts/` (`forge init --no-git`); add `foundry.toml` with `solc = "0.8.28"`, `optimizer = true`, `optimizer_runs = 200`.
+- [X] T005 [P] Pin OpenZeppelin Contracts v5.2.0 in `contracts/foundry.toml` remappings; install via `forge install OpenZeppelin/openzeppelin-contracts@v5.2.0 --no-commit`.
+- [X] T006 [P] Create `circuits/` skeleton with `Nargo.toml` and `src/main.nr` placeholder. Document under `circuits/README.md` that the Noir circuit is production trajectory only.
+- [X] T007 Configure root TypeScript at `tsconfig.base.json` (strict mode, `target: "ES2022"`, `module: "ESNext"`, `moduleResolution: "bundler"`); each app extends with its own `tsconfig.json`.
+- [X] T008 [P] Configure root ESLint at `.eslintrc.cjs` (Next.js + TypeScript strict + import-cycles plugin). Each app inherits.
+- [X] T009 [P] Configure root Prettier at `.prettierrc.json` (2 spaces, single quotes, no trailing commas in JSON).
+- [X] T010 Add Tailwind v3 to both `apps/platform/` and `apps/issuer/`; copy `design/css/tokens.css` into each app's `app/globals.css` as the `@theme` block.
+- [X] T011 [P] Install `sharp`, `jose`, `siwe@2`, `wagmi@2`, `viem@2`, `better-sqlite3`, `zod`, `react-hook-form`, `@hookform/resolvers`, `lucide-react`, `class-variance-authority`, `tailwind-merge` in `apps/platform/`.
+- [X] T012 [P] Install `jose`, `siwe@2`, `better-sqlite3`, `zod` in `apps/issuer/`.
+- [X] T013 [P] Install `@ethereum-attestation-service/eas-sdk` in `apps/platform/`.
+- [X] T014 Add `madge` and `dependency-cruiser` as workspace dev-deps for the modularity gate (Constitution Inv 7).
+- [X] T015 [P] Set up Playwright in `apps/platform/` (`playwright.config.ts`); browsers via `pnpm exec playwright install chromium firefox`.
+- [X] T016 [P] Set up vitest in `apps/platform/` (`vitest.config.ts`) plus `@vitest/web-worker` for crypto-path unit tests.
+- [X] T017 Create `.env.example` at the repo root listing every env var the workspace consumes (DATABASE paths, OPERATOR_PRIVATE_KEY, NEXT_PUBLIC_RPC_URL, NEXT_PUBLIC_CHAIN_ID, NGROK_HOSTNAME, PUBLIC_URL, DEV_BYPASS_EUDI). Document which are dev-only.
+- [X] T018 [P] Add `.gitignore` lines for `apps/*/data/`, `apps/*/.next/`, `node_modules/`, `dist/`, `cache/`, `out/`, `broadcast/`, `circuits/target/`.
 
 ---
 
@@ -62,17 +62,17 @@ This is a pnpm-workspace monorepo with three runtime processes:
 
 ### Solidity contracts
 
-- [ ] T019 Implement `contracts/src/AttestationManager.sol` with `attestVerifiedLawyer`, `attestVerifiedClient`, `revokeCapability`, `hasCapability`, the `onlyOperator` modifier, and the `Attested`/`Revoked` events per [contracts/solidity-surface.md](./contracts/solidity-surface.md#attestationmanagersol).
-- [ ] T020 Implement `contracts/src/StubZKConflictVerifier.sol` with `verifyProof` returning `true` and a `TODO(production)` comment block referencing the bb-generated swap.
-- [ ] T021 Implement `contracts/src/LegalEngagementEscrow.sol`: `Engagement`/`Proposal` structs, all state machines from data-model.md, `openFreeEngagement`, `openPaidEngagementAndFundConsultation`, `fundProposal` (verifies lawyer signature on chain), `markDelivered`, `releaseProposal`, `disputeProposal`, `escalateProposal` (with `cooldownElapsed` modifier), `resolveDispute` (sum-equality require), `mutualRefundProposal` (verifies both signatures), `closeEngagement`, `anchorTranscript`, `setConflictRoot`, `lawyerConflictRoot`, all events.
-- [ ] T022 Define interface contract `contracts/src/interfaces/IZKConflictVerifier.sol` and import it from `LegalEngagementEscrow.sol`.
-- [ ] T023 Write `contracts/script/Deploy.s.sol`: deploy `AttestationManager` (operator = msg.sender), register the two EAS schemas, deploy `StubZKConflictVerifier`, deploy `LegalEngagementEscrow(attestationManager, verifier, operator)`, print all addresses + EAS UIDs as JSON to `apps/platform/lib/chain/addresses.ts`.
-- [ ] T024 [P] Foundry test `contracts/test/AsymmetricMechanism.t.sol`: client may dispute Funded or Delivered without cooldown; lawyer escalation reverts at `delivered+30days-1` and succeeds at `+0`. (Constitution Inv 6.)
-- [ ] T025 [P] Foundry test `contracts/test/EscrowFlow.t.sol`: full proposal lifecycle Funded → Delivered → Released; release on Funded (no markDelivered) succeeds; double-release reverts; `closeEngagement` requires every proposal terminal.
-- [ ] T026 [P] Foundry test `contracts/test/CapabilityChecks.t.sol`: `openPaidEngagementAndFundConsultation` reverts if client lacks `verified_client` or lawyer lacks `verified_lawyer`; non-operator `resolveDispute` reverts.
-- [ ] T027 [P] Foundry test `contracts/test/MutualRefund.t.sol`: refund requires BOTH signatures; refund of a Delivered proposal reverts (must use dispute path); unilateral refund unconditionally reverts.
-- [ ] T028 [P] Foundry test `contracts/test/ResolveSplit.t.sol`: `resolveDispute` requires `amountToLawyer + amountToClient == proposal.amount` to the wei.
-- [ ] T029 [P] Foundry test `contracts/test/ConcurrentTransitions.t.sol`: when two transactions race to advance the same proposal, the first succeeds and the second reverts (FR-058 chain-as-arbiter rule).
+- [X] T019 Implement `contracts/src/AttestationManager.sol` with `attestVerifiedLawyer`, `attestVerifiedClient`, `revokeCapability`, `hasCapability`, the `onlyOperator` modifier, and the `Attested`/`Revoked` events per [contracts/solidity-surface.md](./contracts/solidity-surface.md#attestationmanagersol).
+- [X] T020 Implement `contracts/src/StubZKConflictVerifier.sol` with `verifyProof` returning `true` and a `TODO(production)` comment block referencing the bb-generated swap.
+- [X] T021 Implement `contracts/src/LegalEngagementEscrow.sol`: `Engagement`/`Proposal` structs, all state machines from data-model.md, `openFreeEngagement`, `openPaidEngagementAndFundConsultation`, `fundProposal` (verifies lawyer signature on chain), `markDelivered`, `releaseProposal`, `disputeProposal`, `escalateProposal` (with `cooldownElapsed` modifier), `resolveDispute` (sum-equality require), `mutualRefundProposal` (verifies both signatures), `closeEngagement`, `anchorTranscript`, `setConflictRoot`, `lawyerConflictRoot`, all events.
+- [X] T022 Define interface contract `contracts/src/interfaces/IZKConflictVerifier.sol` and import it from `LegalEngagementEscrow.sol`.
+- [X] T023 Write `contracts/script/Deploy.s.sol`: deploy `AttestationManager` (operator = msg.sender), register the two EAS schemas, deploy `StubZKConflictVerifier`, deploy `LegalEngagementEscrow(attestationManager, verifier, operator)`, print all addresses + EAS UIDs as JSON to `apps/platform/lib/chain/addresses.ts`.
+- [X] T024 [P] Foundry test `contracts/test/AsymmetricMechanism.t.sol`: client may dispute Funded or Delivered without cooldown; lawyer escalation reverts at `delivered+30days-1` and succeeds at `+0`. (Constitution Inv 6.)
+- [X] T025 [P] Foundry test `contracts/test/EscrowFlow.t.sol`: full proposal lifecycle Funded → Delivered → Released; release on Funded (no markDelivered) succeeds; double-release reverts; `closeEngagement` requires every proposal terminal.
+- [X] T026 [P] Foundry test `contracts/test/CapabilityChecks.t.sol`: `openPaidEngagementAndFundConsultation` reverts if client lacks `verified_client` or lawyer lacks `verified_lawyer`; non-operator `resolveDispute` reverts.
+- [X] T027 [P] Foundry test `contracts/test/MutualRefund.t.sol`: refund requires BOTH signatures; refund of a Delivered proposal reverts (must use dispute path); unilateral refund unconditionally reverts.
+- [X] T028 [P] Foundry test `contracts/test/ResolveSplit.t.sol`: `resolveDispute` requires `amountToLawyer + amountToClient == proposal.amount` to the wei.
+- [X] T029 [P] Foundry test `contracts/test/ConcurrentTransitions.t.sol`: when two transactions race to advance the same proposal, the first succeeds and the second reverts (FR-058 chain-as-arbiter rule).
 
 ### Chain bindings + viem
 
