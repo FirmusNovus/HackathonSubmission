@@ -96,6 +96,10 @@ export async function syncFromChain(): Promise<{ ok: true; toBlock: bigint } | {
             disputed_tx_hash: txHash ?? null,
             dispute_filed_by: filed_by,
           });
+          if (proposalIndex === 0) {
+            const c = getConsultationByEngagementId(engagementId);
+            if (c && c.status !== 'COMPLETED') setConsultationStatus(c.id, 'DISPUTED');
+          }
           upsertDispute({
             engagement_id: engagementId,
             proposal_index: proposalIndex,

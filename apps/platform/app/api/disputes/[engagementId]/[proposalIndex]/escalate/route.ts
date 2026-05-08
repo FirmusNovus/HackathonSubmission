@@ -8,6 +8,7 @@ import { escrow } from '@/lib/chain/contracts';
 import { publicClient } from '@/lib/chain/client';
 import { keccak256, toBytes } from 'viem';
 import { syncFromChain } from '@/lib/chain/indexer';
+import { classifyRevert } from '@/lib/chain/broadcast';
 
 export const runtime = 'nodejs';
 
@@ -18,12 +19,17 @@ export async function POST(_req: Request, ctx: { params: { engagementId: string;
 
   const wallet = devWalletForAddress(session.address);
   const root = keccak256(toBytes(`escalate-root:${session.address}:${Date.now()}`));
-  const tx = await wallet.writeContract({
-    ...escrow,
-    functionName: 'escalateProposal',
-    args: [BigInt(ctx.params.engagementId), BigInt(ctx.params.proposalIndex), root],
-  });
-  await publicClient.waitForTransactionReceipt({ hash: tx });
-  await syncFromChain();
-  return NextResponse.json({ ok: true, txHash: tx });
+  try {
+    const tx = await wallet.writeContract({
+      ...escrow,
+      functionName: 'escalateProposal',
+      args: [BigInt(ctx.params.engagementId), BigInt(ctx.params.proposalIndex), root],
+    });
+    await publicClient.waitForTransactionReceipt({ hash: tx });
+    await syncFromChain();
+    return NextResponse.json({ ok: true, txHash: tx });
+  } catch (e) {
+    const r = classifyRevert(e);
+    return NextResponse.json({ error: r.code, detail: r.detail }, { status: r.status });
+  }
 }

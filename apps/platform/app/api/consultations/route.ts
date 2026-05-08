@@ -14,6 +14,7 @@ import { isBypassActive } from '@/lib/dev/bypass-guard';
 import { escrow } from '@/lib/chain/contracts';
 import { publicClient } from '@/lib/chain/client';
 import { syncFromChain } from '@/lib/chain/indexer';
+import { classifyRevert } from '@/lib/chain/broadcast';
 
 export const runtime = 'nodejs';
 
@@ -87,7 +88,8 @@ export async function POST(req: NextRequest) {
     const opened = receipt.logs.find((l) => l.address.toLowerCase() === escrow.address.toLowerCase());
     if (opened?.topics?.[1]) engagementId = BigInt(opened.topics[1]);
   } catch (e) {
-    return NextResponse.json({ error: 'broadcast-failed', detail: (e as Error).message }, { status: 500 });
+    const r = classifyRevert(e);
+    return NextResponse.json({ error: r.code, detail: r.detail }, { status: r.status });
   }
 
   const engagementIdNum = Number(engagementId);

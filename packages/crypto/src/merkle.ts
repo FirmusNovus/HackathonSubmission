@@ -6,12 +6,12 @@ const TREE_DEPTH = 16;
 export type HexString = `0x${string}`;
 
 async function sha256(bytes: Uint8Array): Promise<Uint8Array> {
-  if (typeof globalThis.crypto?.subtle !== 'undefined') {
-    return new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes as BufferSource));
+  // Browser-only via WebCrypto. Node 20+ also exposes globalThis.crypto.subtle,
+  // so vitest tests work without an extra polyfill.
+  if (typeof globalThis.crypto?.subtle === 'undefined') {
+    throw new Error('WebCrypto not available — browser or Node 20+ required');
   }
-  // Node fallback for tests outside the browser bundle.
-  const { createHash } = await import('node:crypto');
-  return new Uint8Array(createHash('sha256').update(bytes).digest());
+  return new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes as BufferSource));
 }
 
 function toHex(bytes: Uint8Array): HexString {

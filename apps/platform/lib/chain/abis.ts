@@ -2,6 +2,8 @@
 // Hand-trimmed ABI fragments — only the fns + events used by the platform.
 
 export const attestationManagerAbi = [
+  { type: 'error', name: 'NotOperator', inputs: [] },
+  { type: 'error', name: 'NoSuchAttestation', inputs: [] },
   {
     type: 'function',
     name: 'SCHEMA_LAWYER',
@@ -84,6 +86,25 @@ export const attestationManagerAbi = [
 ] as const;
 
 export const escrowAbi = [
+  // Custom errors — viem decodes reverts via these.
+  { type: 'error', name: 'NotEngagementClient', inputs: [] },
+  { type: 'error', name: 'NotEngagementLawyer', inputs: [] },
+  { type: 'error', name: 'NotEngagementParty', inputs: [] },
+  { type: 'error', name: 'NotVerifiedClient', inputs: [] },
+  { type: 'error', name: 'NotVerifiedLawyer', inputs: [] },
+  { type: 'error', name: 'CooldownNotElapsed', inputs: [{ type: 'uint64', name: 'unlockAt' }] },
+  { type: 'error', name: 'InvalidProposalState', inputs: [] },
+  { type: 'error', name: 'InvalidEngagementState', inputs: [] },
+  { type: 'error', name: 'ConflictProofFailed', inputs: [] },
+  { type: 'error', name: 'NullifierAlreadyUsed', inputs: [] },
+  { type: 'error', name: 'InvalidSplit', inputs: [] },
+  { type: 'error', name: 'EthAmountMismatch', inputs: [] },
+  { type: 'error', name: 'EngagementNotClean', inputs: [] },
+  { type: 'error', name: 'TransferFailed', inputs: [] },
+  { type: 'error', name: 'OnlyOperator', inputs: [] },
+  { type: 'error', name: 'InvalidRefundSignature', inputs: [] },
+  { type: 'error', name: 'InvalidOfferSignature', inputs: [] },
+  { type: 'error', name: 'NonceAlreadyUsed', inputs: [] },
   {
     type: 'function',
     name: 'openFreeEngagement',

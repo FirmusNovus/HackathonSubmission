@@ -10,6 +10,7 @@ import { isBypassActive } from '@/lib/dev/bypass-guard';
 import { escrow } from '@/lib/chain/contracts';
 import { publicClient } from '@/lib/chain/client';
 import { syncFromChain } from '@/lib/chain/indexer';
+import { classifyRevert } from '@/lib/chain/broadcast';
 
 export const runtime = 'nodejs';
 
@@ -29,15 +30,20 @@ export async function POST(_req: Request, ctx: { params: { id: string } }) {
       return NextResponse.json({ ok: false, error: 'wallet-broadcast-not-implemented' }, { status: 501 });
     }
     const wallet = devWalletForAddress(session.address);
-    const tx = await wallet.writeContract({
-      ...escrow,
-      functionName: 'releaseProposal',
-      args: [BigInt(c.engagement_id), 0n],
-    });
-    await publicClient.waitForTransactionReceipt({ hash: tx });
-    setStatus(id, 'COMPLETED', { escrow_release_tx_hash: tx });
-    await syncFromChain();
-    return NextResponse.json({ ok: true, txHash: tx });
+    try {
+      const tx = await wallet.writeContract({
+        ...escrow,
+        functionName: 'releaseProposal',
+        args: [BigInt(c.engagement_id), 0n],
+      });
+      await publicClient.waitForTransactionReceipt({ hash: tx });
+      setStatus(id, 'COMPLETED', { escrow_release_tx_hash: tx });
+      await syncFromChain();
+      return NextResponse.json({ ok: true, txHash: tx });
+    } catch (e) {
+      const r = classifyRevert(e);
+      return NextResponse.json({ ok: false, error: r.code, detail: r.detail }, { status: r.status });
+    }
   }
 
   setStatus(id, 'COMPLETED');

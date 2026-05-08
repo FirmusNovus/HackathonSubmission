@@ -6,6 +6,7 @@ import { getSessionWithRoles } from '@/lib/auth/session';
 import { operatorWalletClient, publicClient } from '@/lib/chain/client';
 import { escrow } from '@/lib/chain/contracts';
 import { syncFromChain } from '@/lib/chain/indexer';
+import { classifyRevert } from '@/lib/chain/broadcast';
 
 export const runtime = 'nodejs';
 
@@ -18,17 +19,22 @@ export async function POST(req: NextRequest, ctx: { params: { engagementId: stri
   if (!parsed.success) return NextResponse.json({ error: 'bad-request' }, { status: 400 });
 
   const wallet = operatorWalletClient();
-  const tx = await wallet.writeContract({
-    ...escrow,
-    functionName: 'resolveDispute',
-    args: [
-      BigInt(ctx.params.engagementId),
-      BigInt(ctx.params.proposalIndex),
-      BigInt(parsed.data.toLawyer),
-      BigInt(parsed.data.toClient),
-    ],
-  });
-  await publicClient.waitForTransactionReceipt({ hash: tx });
-  await syncFromChain();
-  return NextResponse.json({ ok: true, txHash: tx });
+  try {
+    const tx = await wallet.writeContract({
+      ...escrow,
+      functionName: 'resolveDispute',
+      args: [
+        BigInt(ctx.params.engagementId),
+        BigInt(ctx.params.proposalIndex),
+        BigInt(parsed.data.toLawyer),
+        BigInt(parsed.data.toClient),
+      ],
+    });
+    await publicClient.waitForTransactionReceipt({ hash: tx });
+    await syncFromChain();
+    return NextResponse.json({ ok: true, txHash: tx });
+  } catch (e) {
+    const r = classifyRevert(e);
+    return NextResponse.json({ error: r.code, detail: r.detail }, { status: r.status });
+  }
 }
