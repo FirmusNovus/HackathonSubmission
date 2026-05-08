@@ -1,0 +1,129 @@
+# =====================================================================
+# Local-only state
+# =====================================================================
+
+.local/
+
+
+# =====================================================================
+# Secrets & local environment
+# =====================================================================
+
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Operator wallet keys (only the demo anvil key is acceptable, but
+# even that is loaded from .env.local at boot — never committed).
+**/operator-private-key
+**/data/operator-private-key
+
+# Issuer signing keys are generated at first boot under
+# apps/issuer/data/. Never committed.
+**/data/*.jwk
+
+
+# =====================================================================
+# Per-process app data (SQLite, uploads, cached state)
+# =====================================================================
+
+# Each app's data/ directory holds its SQLite DB plus uploaded files.
+# These are runtime state; they regenerate on a clean clone.
+apps/*/data/
+
+
+# =====================================================================
+# Node + pnpm
+# =====================================================================
+
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+npm-debug.log*
+yarn-error.log
+yarn-debug.log*
+
+
+# =====================================================================
+# Next.js build output
+# =====================================================================
+
+apps/*/.next/
+apps/*/out/
+apps/*/.turbo/
+apps/*/next-env.d.ts
+apps/*/.next-test/
+
+# Per-app TypeScript build info
+apps/*/*.tsbuildinfo
+
+
+# =====================================================================
+# Foundry (contracts/)
+# =====================================================================
+
+contracts/cache/
+contracts/out/
+contracts/broadcast/
+contracts/lib/
+contracts/.gas-snapshot
+contracts/foundry.lock
+
+
+# =====================================================================
+# Noir (circuits/)
+# =====================================================================
+
+circuits/target/
+circuits/Prover.toml.bak
+
+
+# =====================================================================
+# Test artifacts
+# =====================================================================
+
+# Playwright
+apps/*/test-results/
+apps/*/playwright-report/
+apps/*/playwright/.cache/
+
+# Vitest / Jest coverage
+coverage/
+*.lcov
+
+
+# =====================================================================
+# IDE / editor / OS
+# =====================================================================
+
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.shared.json
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+
+# =====================================================================
+# Logs
+# =====================================================================
+
+*.log
+
+
+# =====================================================================
+# Spec Kit transient state
+# =====================================================================
+
+# .specify/feature.json points at the active feature directory.
+# Tracked because it pins the workspace's "current work" pointer.
+# (Do NOT add it to .gitignore — leaving this comment for clarity.)
