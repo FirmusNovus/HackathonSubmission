@@ -23,6 +23,7 @@ SCENARIOS=(
   s16-large-payloads
   s17-many-proposals
   s18-ui-render
+  s19-revocation-mid-flow
 )
 
 PASS=0

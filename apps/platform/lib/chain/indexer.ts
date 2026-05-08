@@ -3,11 +3,12 @@
 // reconciles SQLite mirrors. Resilient to chain unavailability (FR-061).
 
 import { publicClient } from './client';
-import { escrow, attestationManager } from './contracts';
+import { escrow, attestationManager, SCHEMA_LAWYER, SCHEMA_CLIENT } from './contracts';
 import { setProposalState } from '@/lib/db/proposals';
 import { upsertDispute } from '@/lib/db/disputes';
 import { upsertEngagement, getEngagement } from '@/lib/db/engagements';
 import { setStatus as setConsultationStatus, getConsultationByEngagementId } from '@/lib/db/consultations';
+import { getDb } from '@/lib/db/client';
 
 let lastSyncedBlock: bigint | null = null;
 
@@ -18,6 +19,54 @@ export async function syncFromChain(): Promise<{ ok: true; toBlock: bigint } | {
     if (fromBlock > head) {
       lastSyncedBlock = head;
       return { ok: true, toBlock: head };
+    }
+
+    // Pull AttestationManager Revoked events so the directory drops revoked
+    // lawyers. We cleared `revoked_at` on attest from /api/dev/login already;
+    // here we mirror chain-side revocations.
+    const amLogs = await publicClient.getContractEvents({
+      address: attestationManager.address,
+      abi: attestationManager.abi,
+      eventName: 'Revoked',
+      fromBlock,
+      toBlock: head,
+    });
+    const now = Math.floor(Date.now() / 1000);
+    for (const log of amLogs) {
+      const args = log.args as { subject?: string; schemaId?: string };
+      const subject = (args.subject ?? '').toLowerCase();
+      const role: 'lawyer' | 'client' | null =
+        args.schemaId === SCHEMA_LAWYER ? 'lawyer'
+        : args.schemaId === SCHEMA_CLIENT ? 'client'
+        : null;
+      if (subject && role) {
+        getDb()
+          .prepare(`UPDATE verified_users SET revoked_at = ? WHERE eth_address = ? AND attested_role = ?`)
+          .run(now, subject, role);
+      }
+    }
+
+    // Mirror Attested events too — re-attestation after a previous revoke
+    // must clear revoked_at so the directory shows the lawyer again.
+    const attestedLogs = await publicClient.getContractEvents({
+      address: attestationManager.address,
+      abi: attestationManager.abi,
+      eventName: 'Attested',
+      fromBlock,
+      toBlock: head,
+    });
+    for (const log of attestedLogs) {
+      const args = log.args as { subject?: string; schemaId?: string; attestationUid?: string };
+      const subject = (args.subject ?? '').toLowerCase();
+      const role: 'lawyer' | 'client' | null =
+        args.schemaId === SCHEMA_LAWYER ? 'lawyer'
+        : args.schemaId === SCHEMA_CLIENT ? 'client'
+        : null;
+      if (subject && role && args.attestationUid) {
+        getDb()
+          .prepare(`UPDATE verified_users SET revoked_at = NULL, attestation_uid = ? WHERE eth_address = ? AND attested_role = ?`)
+          .run(args.attestationUid, subject, role);
+      }
     }
 
     const logs = await publicClient.getContractEvents({
