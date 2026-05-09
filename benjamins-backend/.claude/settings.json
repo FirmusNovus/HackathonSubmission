@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "WebFetch(domain:wwwallet.github.io)",
+      "Bash(mkdir -p \"/home/benjamin/Projects/My Projects/lex-nova/spike/wallet-integration\")",
+      "Bash(npm pkg *)",
+      "Bash(cloudflared --version)",
+      "Bash(grep -rB 2 -A 10 \"enum VerifiableCredentialFormat\" /tmp/wallet-common)",
+      "Bash(sed -n '30,55p' /tmp/wallet-frontend/src/lib/services/OpenID4VCI/OpenID4VCI.ts)",
+      "Bash(sed -n '95,125p' /tmp/wallet-frontend/src/lib/services/OpenID4VCI/OpenID4VCI.ts)"
+    ]
+  }
+}

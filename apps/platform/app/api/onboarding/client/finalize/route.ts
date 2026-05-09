@@ -10,7 +10,7 @@ import { getSession } from '@/lib/auth/session';
 import { readState, clearResult } from '@/lib/verifier/state';
 import { operatorWalletClient, publicClient } from '@/lib/chain/client';
 import { attestationManager } from '@/lib/chain/contracts';
-import { upsertVerifiedUser } from '@/lib/db/verified-users';
+import { upsertVerifiedUser, getVerifiedUser } from '@/lib/db/verified-users';
 
 export const runtime = 'nodejs';
 
@@ -27,12 +27,21 @@ export async function POST(req: NextRequest) {
   if (row.kind !== 'pid') {
     return NextResponse.json({ error: 'wrong kind for client finalize' }, { status: 400 });
   }
-  if (row.status !== 'verified' || !row.result_json) {
+  if (row.status !== 'verified') {
     return NextResponse.json({ error: 'not verified yet' }, { status: 409 });
   }
   const subject = (row.bound_address ?? '').toLowerCase();
   if (!subject || subject !== session.address.toLowerCase()) {
     return NextResponse.json({ error: 'state-session mismatch' }, { status: 403 });
+  }
+
+  // Idempotency: if a verified_users row already exists for this (address, role),
+  // we're being called again for an already-finalized state. Return ok.
+  if (getVerifiedUser(subject, 'client')) {
+    return NextResponse.json({ ok: true, already: true });
+  }
+  if (!row.result_json) {
+    return NextResponse.json({ error: 'verifier result already consumed' }, { status: 409 });
   }
 
   const result = JSON.parse(row.result_json) as { disclosed: Record<string, unknown> };

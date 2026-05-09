@@ -1,0 +1,30 @@
+{
+  "name": "wallet-integration",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "issuer": "node issuer.mjs",
+    "verifier": "node verifier.mjs",
+    "both": "concurrently -n issuer,verifier -c blue,green 'node issuer.mjs' 'node verifier.mjs'"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@cef-ebsi/key-did-resolver": "^2.1.1",
+    "@cef-ebsi/verifiable-credential": "^7.2.0",
+    "@sd-jwt/core": "^0.19.0",
+    "@sd-jwt/sd-jwt-vc": "^0.19.0",
+    "did-jwt": "^8.0.18",
+    "express": "^5.2.1",
+    "http-proxy-middleware": "^4.0.0",
+    "jose": "^6.2.3",
+    "selfsigned": "^5.5.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

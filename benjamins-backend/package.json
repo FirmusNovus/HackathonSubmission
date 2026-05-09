@@ -1,0 +1,42 @@
+{
+  "name": "lex-nova",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "anvil": "dotenv -e .env -- bash -c 'anvil --block-time 2 --accounts 10 --balance 100 --gas-price 0 --base-fee 0 ${ANVIL_MNEMONIC:+--mnemonic \"$ANVIL_MNEMONIC\"}'",
+    "dev": "dotenv -e .env -- concurrently -n proxy,platform,bar,pid -c blue,green,magenta,yellow \"pnpm -F @lex-nova/proxy dev\" \"pnpm -F @lex-nova/platform dev\" \"pnpm -F @lex-nova/bar-issuer dev\" \"pnpm -F @lex-nova/pid-issuer dev\"",
+    "dev:platform": "dotenv -e .env -- pnpm -F @lex-nova/platform dev",
+    "dev:bar-issuer": "dotenv -e .env -- pnpm -F @lex-nova/bar-issuer dev",
+    "dev:pid-issuer": "dotenv -e .env -- pnpm -F @lex-nova/pid-issuer dev",
+    "dev:proxy": "dotenv -e .env -- pnpm -F @lex-nova/proxy dev",
+    "build": "pnpm -r --if-present build",
+    "test": "pnpm -r --if-present test",
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "scripts:deploy": "dotenv -e .env -- bash -c 'cd contracts && forge script script/Deploy.s.sol --rpc-url ${RPC_URL:-http://127.0.0.1:8545} --broadcast'",
+    "scripts:seed": "dotenv -e .env -- bash -c 'pnpm -F @lex-nova/bar-issuer seed && pnpm -F @lex-nova/pid-issuer seed'",
+    "scripts:reset": "rm -rf apps/platform/data apps/bar-issuer/data apps/pid-issuer/data apps/platform/lib/chain/deployed-addresses.json && pnpm scripts:deploy && pnpm scripts:seed",
+    "scripts:check-attestations": "dotenv -e .env -- tsx scripts/check-attestations.ts"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "better-sqlite3": "^11.5.0",
+    "concurrently": "^9.1.2",
+    "dotenv-cli": "^8.0.0",
+    "jose": "^5.9.6",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.2",
+    "viem": "^2.21.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "bufferutil",
+      "esbuild",
+      "keccak",
+      "secp256k1",
+      "unrs-resolver",
+      "utf-8-validate"
+    ]
+  }
+}

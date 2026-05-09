@@ -1,0 +1,19 @@
+{
+  "name": "@lex-nova/proxy",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "http-proxy": "^1.18.1"
+  },
+  "devDependencies": {
+    "@types/http-proxy": "^1.17.15",
+    "@types/node": "^20",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.2"
+  }
+}
