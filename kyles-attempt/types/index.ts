@@ -1,4 +1,5 @@
 import type { Booking, LawyerProfile, Message, User } from "@prisma/client";
+import type { BookingStatus, PricingKind, VerificationStatus } from "@/lib/db/enums";
 
 export type PricingItem = {
   title: string;
@@ -26,13 +27,30 @@ export type Deliverable = {
   description?: string;
 };
 
-export type LawyerProfileWithUser = LawyerProfile & {
+// SQLite stores list-shaped fields as JSON-encoded strings, and the four
+// removed-from-Prisma enum columns are stored as plain strings. The expanded
+// shape narrows them back down to the union types used by the UI layer.
+type ExpandedLawyerProfile = Omit<
+  LawyerProfile,
+  "specialties" | "languages" | "jurisdictions" | "tags" | "credentialDocsUrl" | "pricingKind" | "verificationStatus"
+> & {
+  specialties: string[];
+  languages: string[];
+  jurisdictions: string[];
+  tags: string[];
+  credentialDocsUrl: string[];
+  pricingKind: PricingKind;
+  verificationStatus: VerificationStatus;
+};
+
+export type LawyerProfileWithUser = ExpandedLawyerProfile & {
   user: User;
   pricingItems: PricingItem[];
 };
 
-export type BookingWithRelations = Booking & {
-  lawyerProfile: LawyerProfile & { user: User };
+export type BookingWithRelations = Omit<Booking, "status"> & {
+  status: BookingStatus;
+  lawyerProfile: ExpandedLawyerProfile & { user: User };
   client: User;
 };
 

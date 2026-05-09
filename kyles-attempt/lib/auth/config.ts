@@ -1,7 +1,7 @@
 import NextAuth, { type DefaultSession, type NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { SiweMessage } from "siwe";
-import { Role } from "@prisma/client";
+import { Role } from "@/lib/db/enums";
 import { prisma } from "@/lib/db/client";
 
 declare module "next-auth" {
@@ -37,6 +37,7 @@ const devLoginProvider = Credentials({
   credentials: {
     walletAddress: { label: "Wallet", type: "text" },
     role: { label: "Role", type: "text" },
+    ebsiWalletProvider: { label: "EBSI provider", type: "text" },
   },
   authorize: async (credentials) => {
     if (!isDev) return null;
@@ -44,15 +45,29 @@ const devLoginProvider = Credentials({
     if (!wallet) return null;
     const requestedRole =
       String(credentials?.role ?? "CLIENT").toUpperCase() === "LAWYER" ? Role.LAWYER : Role.CLIENT;
+    const ebsi = credentials?.ebsiWalletProvider ? String(credentials.ebsiWalletProvider) : null;
     const existing = await prisma.user.findUnique({ where: { walletAddress: wallet } });
-    const user =
-      existing ??
-      (await prisma.user.create({
-        data: { walletAddress: wallet, role: requestedRole, ebsiWalletProvider: "ds" },
-      }));
+    // Lazy-import to avoid pulling viem into the JWT/edge bundle. Only used
+    // on the dev-login authorize path (Node runtime).
+    const { devSignerAddressForWallet } = await import("@/lib/chain/dev-signer");
+    const user = existing
+      ? existing.devSignerAddress
+        ? existing
+        : await prisma.user.update({
+            where: { id: existing.id },
+            data: { devSignerAddress: devSignerAddressForWallet(wallet) },
+          })
+      : await prisma.user.create({
+          data: {
+            walletAddress: wallet,
+            role: requestedRole,
+            ebsiWalletProvider: ebsi,
+            devSignerAddress: devSignerAddressForWallet(wallet),
+          },
+        });
     return {
       id: user.id,
-      role: user.role,
+      role: user.role as Role,
       walletAddress: user.walletAddress,
       ebsiWalletProvider: user.ebsiWalletProvider,
       name: user.name ?? undefined,
@@ -92,23 +107,37 @@ const config = {
         const requestedRole = String(credentials.role ?? "CLIENT").toUpperCase() === "LAWYER" ? Role.LAWYER : Role.CLIENT;
         const ebsi = credentials.ebsiWalletProvider ? String(credentials.ebsiWalletProvider) : null;
 
+        // `devSignerAddress` is populated only on the dev/test surface — in
+        // production, real wallets sign in the browser and the dev-signer
+        // fallback in `verifyProposalOfferSigForUser` is gated off anyway.
+        // Writing it here in production would leave a publicly-derivable
+        // alias on every real user row, defeating the production gate the
+        // first time someone re-enables the fallback by accident.
+        const { devSignerAddressForWallet } = await import("@/lib/chain/dev-signer");
+        const writeDevAlias = isDev;
         const existing = await prisma.user.findUnique({ where: { walletAddress: wallet } });
         const user = existing
           ? await prisma.user.update({
               where: { id: existing.id },
-              data: ebsi && existing.ebsiWalletProvider !== ebsi ? { ebsiWalletProvider: ebsi } : {},
+              data: {
+                ...(ebsi && existing.ebsiWalletProvider !== ebsi ? { ebsiWalletProvider: ebsi } : {}),
+                ...(writeDevAlias && !existing.devSignerAddress
+                  ? { devSignerAddress: devSignerAddressForWallet(wallet) }
+                  : {}),
+              },
             })
           : await prisma.user.create({
               data: {
                 walletAddress: wallet,
                 role: requestedRole,
                 ebsiWalletProvider: ebsi,
+                ...(writeDevAlias ? { devSignerAddress: devSignerAddressForWallet(wallet) } : {}),
               },
             });
 
         return {
           id: user.id,
-          role: user.role,
+          role: user.role as Role,
           walletAddress: user.walletAddress,
           ebsiWalletProvider: user.ebsiWalletProvider,
           name: user.name ?? undefined,

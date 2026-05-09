@@ -6,6 +6,8 @@
     "dev": "next dev",
     "dev:up": "./scripts/dev-up.sh",
     "dev:down": "./scripts/dev-down.sh",
+    "check:no-server-decryption": "./scripts/check-no-server-decryption.sh",
+    "prebuild": "./scripts/check-no-server-decryption.sh",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",

@@ -52,11 +52,17 @@ test("Stale cookie after DB reseed — POST /api/messages still succeeds", async
   const list = await page.request.get("/api/bookings");
   expect(list.status()).toBe(200);
   const { bookings } = (await list.json()) as { bookings: Array<{ id: string }> };
-  if (!bookings.length) test.skip();
+  if (!bookings.length) {
+    test.skip();
+    return;
+  }
   const detail = await page.request.get(`/api/bookings/${bookings[0].id}`);
   expect(detail.status()).toBe(200);
   const { booking } = (await detail.json()) as { booking: { conversation?: { id: string } | null } };
-  if (!booking.conversation) test.skip();
+  if (!booking.conversation) {
+    test.skip();
+    return;
+  }
 
   const r = await page.request.post("/api/messages", {
     data: { conversationId: booking.conversation.id, content: "Surviving the reseed." },

@@ -1,18 +1,20 @@
 import { redirect } from "next/navigation";
-import { Role } from "@prisma/client";
+import { Role } from "@/lib/db/enums";
 import { prisma } from "@/lib/db/client";
-import { requireLawyer } from "@/lib/auth/session";
+import { requireLawyerForExistingBooking } from "@/lib/auth/session";
 import { AppTopBar } from "@/components/layout/app-top-bar";
 import { MessagesView } from "@/app/client/messages/messages-view";
 
 export const dynamic = "force-dynamic";
 
+// F2: role-only gate. Mirrors the contract semantic — a revoked lawyer must
+// still be able to read/respond on threads attached to in-flight bookings.
 export default async function LawyerMessagesPage({
   searchParams,
 }: {
   searchParams: Promise<{ booking?: string }>;
 }) {
-  const session = await requireLawyer();
+  const session = await requireLawyerForExistingBooking();
   const sp = await searchParams;
   const conversations = await prisma.conversation.findMany({
     where: { participants: { some: { id: session.user.id } } },

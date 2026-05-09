@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, Calendar, ExternalLink, Lock, Check } from "lucide-react";
 import { prisma } from "@/lib/db/client";
+import { expandLawyerProfile } from "@/lib/db/json-array";
+import { hasVerifiedCapability } from "@/lib/auth/capability";
+import { SCHEMA_LAWYER } from "@/lib/chain/schemas";
 import { MarketingNav } from "@/components/layout/marketing-nav";
 import { Footer } from "@/components/layout/footer";
 import { AvatarBubble } from "@/components/firmus/avatar-bubble";
@@ -15,8 +18,15 @@ import { formatEUR, formatScheduled } from "@/lib/utils/format";
 
 export default async function LawyerProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const lawyer = await prisma.lawyerProfile.findUnique({ where: { id }, include: { user: true } });
-  if (!lawyer) notFound();
+  const row = await prisma.lawyerProfile.findUnique({ where: { id }, include: { user: true } });
+  if (!row) notFound();
+  // F2: 404 if the lawyer has no active SCHEMA_LAWYER capability (e.g. the
+  // operator revoked them). Mirrors A's pattern in
+  // `apps/platform/app/lawyers/[id]/page.tsx` of treating revoked profiles
+  // as if they don't exist on the public surface.
+  const ok = await hasVerifiedCapability(row.user.walletAddress, SCHEMA_LAWYER);
+  if (!ok) notFound();
+  const lawyer = { ...expandLawyerProfile(row), user: row.user };
 
   const items = (lawyer.pricingItems ?? []) as unknown as PricingItem[];
   const isHourly = lawyer.pricingKind === "HOURLY";

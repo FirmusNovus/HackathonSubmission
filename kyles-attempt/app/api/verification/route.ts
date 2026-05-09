@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { PricingKind, Role, VerificationStatus } from "@prisma/client";
+import { PricingKind, Role, VerificationStatus } from "@/lib/db/enums";
 import { prisma } from "@/lib/db/client";
+import { stringifyStrArray } from "@/lib/db/json-array";
 import { getCurrentUser } from "@/lib/auth/session";
 import { verifyLawyerCredentials } from "@/lib/web3/ebsi";
+import { attestVerifiedLawyer, OPERATOR_ADDRESS } from "@/lib/chain/escrow";
+import type { LawyerClaims } from "@/lib/chain/schemas";
 
 const SubmitSchema = z.object({
   fullName: z.string().min(1).max(120),
@@ -47,9 +50,9 @@ export async function POST(request: Request) {
       city: v.city,
       headline: v.headline,
       bio: v.bio,
-      specialties: v.specialties,
-      languages: v.languages,
-      jurisdictions: v.jurisdictions,
+      specialties: stringifyStrArray(v.specialties),
+      languages: stringifyStrArray(v.languages),
+      jurisdictions: stringifyStrArray(v.jurisdictions),
       pricingKind: v.pricingKind,
       pricingHeadline: v.pricingHeadline,
       hourlyRateEUR: v.hourlyRateEUR,
@@ -61,16 +64,16 @@ export async function POST(request: Request) {
       barRegistrationNum: v.barRegistrationNum,
       barJurisdiction: v.barJurisdiction,
       admissionDate: new Date(v.admissionDate),
-      credentialDocsUrl: v.credentialDocsUrl,
-      tags: v.specialties.slice(0, 3),
+      credentialDocsUrl: stringifyStrArray(v.credentialDocsUrl),
+      tags: stringifyStrArray(v.specialties.slice(0, 3)),
     },
     update: {
       city: v.city,
       headline: v.headline,
       bio: v.bio,
-      specialties: v.specialties,
-      languages: v.languages,
-      jurisdictions: v.jurisdictions,
+      specialties: stringifyStrArray(v.specialties),
+      languages: stringifyStrArray(v.languages),
+      jurisdictions: stringifyStrArray(v.jurisdictions),
       pricingKind: v.pricingKind,
       pricingHeadline: v.pricingHeadline,
       hourlyRateEUR: v.hourlyRateEUR,
@@ -79,12 +82,16 @@ export async function POST(request: Request) {
       barRegistrationNum: v.barRegistrationNum,
       barJurisdiction: v.barJurisdiction,
       admissionDate: new Date(v.admissionDate),
-      credentialDocsUrl: v.credentialDocsUrl.length ? v.credentialDocsUrl : undefined,
+      credentialDocsUrl: v.credentialDocsUrl.length ? stringifyStrArray(v.credentialDocsUrl) : undefined,
     },
   });
 
-  // Dev-only auto-verify: simulates the EBSI 48h verification window.
+  // Dev-only auto-verify: simulates the EBSI 48h verification window. F2:
+  // when the timer fires we now mint a SCHEMA_LAWYER capability via the
+  // mock chain (mirrors the operator flow that ships in F4+) AND flip the
+  // column. Both writes happen so the directory + UI badges stay in sync.
   const autoSeconds = Number(process.env.DEV_AUTO_VERIFY_SECONDS);
+  const walletAddress = me.walletAddress;
   if (process.env.NODE_ENV !== "production" && autoSeconds > 0) {
     setTimeout(async () => {
       try {
@@ -93,13 +100,36 @@ export async function POST(request: Request) {
           barRegistrationNum: v.barRegistrationNum,
           jurisdiction: v.barJurisdiction,
         });
-        await prisma.lawyerProfile.update({
-          where: { id: profile.id },
-          data: {
-            verificationStatus: result.verified ? VerificationStatus.VERIFIED : VerificationStatus.REJECTED,
-            ebsiCredentialId: result.ebsiCredentialId,
-          },
-        });
+        if (result.verified) {
+          const claims: LawyerClaims = {
+            jurisdiction: v.barJurisdiction,
+            barAdmissionNumber: v.barRegistrationNum,
+            admittedAt: new Date(v.admissionDate).toISOString(),
+            validUntil: null,
+          };
+          const { uid } = await attestVerifiedLawyer({
+            subject: walletAddress,
+            claims: claims as unknown as Record<string, unknown>,
+            from: OPERATOR_ADDRESS,
+            expiresAt: null,
+          });
+          await prisma.lawyerProfile.update({
+            where: { id: profile.id },
+            data: {
+              verificationStatus: VerificationStatus.VERIFIED,
+              ebsiCredentialId: result.ebsiCredentialId,
+              capabilityUid: uid,
+            },
+          });
+        } else {
+          await prisma.lawyerProfile.update({
+            where: { id: profile.id },
+            data: {
+              verificationStatus: VerificationStatus.REJECTED,
+              ebsiCredentialId: result.ebsiCredentialId,
+            },
+          });
+        }
       } catch (err) {
         console.error("[dev-auto-verify] failed", err);
       }

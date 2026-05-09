@@ -1,16 +1,23 @@
 import { NextResponse } from "next/server";
-import { BookingStatus, Role } from "@prisma/client";
+import { BookingStatus, Role } from "@/lib/db/enums";
 import { prisma } from "@/lib/db/client";
 import { getCurrentUser } from "@/lib/auth/session";
-import { createEscrow } from "@/lib/web3/escrow";
 
 /**
- * The lawyer signs the invoice. Both signatures present → escrow funds → the
- * booking advances to ACCEPTED. The escrow is created HERE rather than at
- * booking-creation time so the user-visible state machine is:
+ * Lawyer confirms a client-initiated invoice. F3 update — escrow is ALREADY
+ * funded at this point (the client funded `Proposal[0]` at booking-creation
+ * time via `openEngagementAndFundFirstProposal`), so this handler is a pure
+ * UX confirmation. No chain mutation happens here.
  *
- *     1. Client signs invoice (POST /api/bookings)            → REQUESTED
- *     2. Lawyer signs invoice (POST /api/bookings/[id]/accept) → ACCEPTED, escrow funded
+ * Why no on-chain accept? System A's `LegalEngagementEscrow.sol` doesn't
+ * expose a "lawyer accept" action — the engagement is simply open the moment
+ * the client funds it, and the lawyer's first action is `markDelivered`.
+ * Lawyer accept is a B-side UX layer (it gates the consultation room before
+ * the meeting). The contract treats Funded as fully active.
+ *
+ * Lawyer-initiated invoices follow the symmetric path: the LAWYER drafts,
+ * the CLIENT signs via `/sign` (which today still calls a stub `createEscrow`
+ * — F4/F6 unify that path with this one). For F3 we leave that route alone.
  */
 export async function POST(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -33,23 +40,12 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
     );
   }
 
-  // STUB: simulate the smart-contract escrow funding. In production this is
-  // signed and submitted by the client's wallet, then verified server-side.
-  const receipt = Number(booking.consultationFeeEUR) > 0
-    ? await createEscrow({
-        bookingId: booking.id,
-        clientWallet: booking.client.walletAddress,
-        lawyerWallet: me.walletAddress,
-        amountEUR: Number(booking.consultationFeeEUR),
-      })
-    : null;
-
+  // Pure status flip; the chain is already open + funded.
   const updated = await prisma.booking.update({
     where: { id },
     data: {
       status: BookingStatus.ACCEPTED,
       lawyerAcceptedAt: new Date(),
-      escrowTxHash: receipt?.txHash ?? null,
     },
   });
   return NextResponse.json({ booking: updated });

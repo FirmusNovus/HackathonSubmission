@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BookingStatus } from "@prisma/client";
+import { BookingStatus } from "@/lib/db/enums";
 
 export function RequestActions({
   bookingId,
@@ -13,7 +13,9 @@ export function RequestActions({
   lawyerSigned,
 }: {
   bookingId: string;
-  status: BookingStatus;
+  // Booking.status is a plain string from Prisma (SQLite has no enums); we
+  // accept any string and compare against the BookingStatus values.
+  status: string;
   clientSigned: boolean;
   lawyerSigned: boolean;
 }) {
@@ -51,6 +53,9 @@ export function RequestActions({
   }
 
   // Standard accept/decline path (client-initiated, lawyer hasn't signed yet).
+  // F3: escrow is ALREADY funded by the client at booking-creation time —
+  // accepting is a UX confirmation, not a fund-now action. Decline does NOT
+  // refund automatically; F6 wires the mutual-refund flow.
   return (
     <div className="mt-8 flex flex-wrap justify-end gap-2.5 border-t border-slate-100 pt-6">
       <Button variant="ghost" onClick={() => action("decline")} disabled={!!busy}>
@@ -61,7 +66,7 @@ export function RequestActions({
       </Button>
       <Button variant="primary" onClick={() => action("accept")} disabled={!!busy}>
         <Check className="h-4 w-4" aria-hidden />{" "}
-        {busy === "accept" ? "Signing & funding escrow…" : "Sign invoice & fund escrow"}
+        {busy === "accept" ? "Accepting…" : "Accept consultation"}
       </Button>
     </div>
   );

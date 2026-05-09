@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { Calendar, Check, FileText, MessageSquare, Video } from "lucide-react";
-import type { BookingStatus } from "@prisma/client";
+import type { BookingStatus } from "@/lib/db/enums";
 import { requireClient } from "@/lib/auth/session";
 import { AppTopBar } from "@/components/layout/app-top-bar";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,10 @@ const STATUS_KIND: Record<BookingStatus, "pending" | "info" | "success" | "neutr
   REQUESTED: "pending",
   ACCEPTED: "info",
   IN_PROGRESS: "info",
+  // F3: DELIVERED — lawyer has marked the consultation deliverable; client
+  // still needs to release escrow. Rendered as "info" alongside ACCEPTED so
+  // the UI signals "in flight, not yet final".
+  DELIVERED: "info",
   COMPLETED: "success",
   CANCELLED: "neutral",
   DECLINED: "neutral",

@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { PricingKind } from "@prisma/client";
+import { PricingKind } from "@/lib/db/enums";
 import { cn } from "@/lib/utils/cn";
 
 // Server component. Filters are a real HTML form with `method=GET action=/lawyers`,

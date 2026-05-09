@@ -2,11 +2,14 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { FirmusLogo } from "@/components/firmus/firmus-logo";
 import { EBSIBadge } from "@/components/firmus/ebsi-badge";
-import { requireLawyer } from "@/lib/auth/session";
+import { requireLawyerRoleOnly } from "@/lib/auth/session";
 import { VerifyLawyerForm } from "./verify-lawyer-form";
 
 export default async function VerifyLawyerPage() {
-  await requireLawyer();
+  // F2: deliberately use the role-only gate here — `requireLawyer()` would
+  // bounce us back to /verify-lawyer in an infinite loop because lawyers on
+  // this page have NOT yet been issued a SCHEMA_LAWYER capability.
+  await requireLawyerRoleOnly();
   return (
     <div className="min-h-screen bg-white-50">
       <header className="flex items-center justify-between border-b border-slate-100 bg-white-0 px-6 py-5 lg:px-12">

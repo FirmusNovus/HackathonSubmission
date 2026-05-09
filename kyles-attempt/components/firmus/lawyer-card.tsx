@@ -1,12 +1,12 @@
 import Link from "next/link";
-import type { LawyerProfile, User } from "@prisma/client";
+import type { LawyerProfileWithUser } from "@/types";
 import { AvatarBubble } from "./avatar-bubble";
 import { PricingBadge } from "./pricing-badge";
 import { Stars } from "./stars";
 import { cn } from "@/lib/utils/cn";
 
 interface LawyerCardProps {
-  lawyer: LawyerProfile & { user: User };
+  lawyer: Omit<LawyerProfileWithUser, "pricingItems">;
   compact?: boolean;
   className?: string;
 }

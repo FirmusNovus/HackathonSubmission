@@ -1,6 +1,29 @@
-import { PrismaClient, Role, PricingKind, VerificationStatus, BookingStatus } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
+import { Role, PricingKind, VerificationStatus, BookingStatus } from "../lib/db/enums";
+import { stringifyStrArray } from "../lib/db/json-array";
+import { devSignerAddressForWallet } from "../lib/chain/eip712";
 
 const prisma = new PrismaClient();
+
+// =============================================================================
+// Mock-chain capability seeding (F1).
+//
+// Mirrors `AttestationManager.attestVerifiedLawyer` from System A. The seed
+// imports the chain layer lazily (inside `main`) to avoid wiring import-time
+// side effects into a script that's also re-run from Playwright global setup.
+// =============================================================================
+
+function fakeAttestationUid(): string {
+  const chars = "0123456789abcdef";
+  let out = "0x";
+  for (let i = 0; i < 64; i += 1) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
+
+const SEEDED_OPERATOR_ADDRESS =
+  process.env.OPERATOR_WALLET?.toLowerCase() ??
+  process.env.OPERATOR_ADDRESS?.toLowerCase() ??
+  "0x09e8a70811111111111111111111111111111bbb";
 
 type SeedLawyer = {
   walletAddress: string;
@@ -375,11 +398,76 @@ async function main() {
   await prisma.conversation.deleteMany();
   await prisma.booking.deleteMany();
   await prisma.lawyerProfile.deleteMany();
+  // Chain-mirror tables (F1). Reset alongside the user-facing tables so a
+  // re-seeded run starts from a clean engagement-id sequence.
+  // F6: clear refund-request rows alongside the auth table.
+  await prisma.mutualRefundRequest.deleteMany();
+  await prisma.mutualRefundAuth.deleteMany();
+  await prisma.proposalOffer.deleteMany();
+  await prisma.consumedProposalNonce.deleteMany();
+  await prisma.usedNullifier.deleteMany();
+  await prisma.transcriptRootHistory.deleteMany();
+  await prisma.chainEvent.deleteMany();
+  await prisma.proposal.deleteMany();
+  await prisma.engagement.deleteMany();
+  await prisma.lawyerConflictRoot.deleteMany();
+  await prisma.capability.deleteMany();
+  await prisma.mockChainCounter.deleteMany();
+  await prisma.mockClock.deleteMany();
   await prisma.user.deleteMany();
   await prisma.nonce.deleteMany();
 
+  console.log(`[seed] Creating operator user @ ${SEEDED_OPERATOR_ADDRESS} …`);
+  // Operator is a real User row so it joins cleanly with anything that
+  // references walletAddress. Role isn't strictly meaningful for the operator
+  // (it's not a CLIENT and not a LAWYER) — we tag CLIENT to satisfy the
+  // string-union without polluting the lawyer directory.
+  await prisma.user.create({
+    data: {
+      walletAddress: SEEDED_OPERATOR_ADDRESS,
+      role: Role.CLIENT,
+      name: "Firmus Novus Operator",
+      email: "operator@firmusnovus.example",
+      devSignerAddress: devSignerAddressForWallet(SEEDED_OPERATOR_ADDRESS),
+    },
+  });
+
+  // F2: mint a SCHEMA_OPERATOR capability for the operator wallet (self-
+  // attestation is fine for the seed — production constructor pins the
+  // operator address into the AttestationManager directly). `requireOperator`
+  // accepts either this capability OR the env-key fallback, so this gives
+  // the dev seed a stable identifier the way the contract has one on-chain.
+  await prisma.capability.create({
+    data: {
+      subjectAddress: SEEDED_OPERATOR_ADDRESS,
+      schemaId: "SCHEMA_OPERATOR",
+      attestationUid: fakeAttestationUid(),
+      claims: JSON.stringify({ note: "Firmus Novus platform operator (seed)" }),
+    },
+  });
+
   console.log("[seed] Creating 12 lawyers …");
   for (const l of LAWYERS) {
+    // Mint the SCHEMA_LAWYER capability ahead of the LawyerProfile so we can
+    // back-reference the UID on the profile row — keeps the directory + UI
+    // badge state in lockstep with the capability state.
+    let capabilityUid: string | null = null;
+    if (l.verificationStatus === VerificationStatus.VERIFIED) {
+      capabilityUid = fakeAttestationUid();
+      await prisma.capability.create({
+        data: {
+          subjectAddress: l.walletAddress.toLowerCase(),
+          schemaId: "SCHEMA_LAWYER",
+          attestationUid: capabilityUid,
+          claims: JSON.stringify({
+            jurisdiction: l.barJurisdiction,
+            barAdmissionNumber: l.barRegistrationNum,
+            admittedAt: l.admissionDate.toISOString(),
+            validUntil: null,
+          }),
+        },
+      });
+    }
     await prisma.user.create({
       data: {
         walletAddress: l.walletAddress.toLowerCase(),
@@ -387,15 +475,16 @@ async function main() {
         name: l.name,
         email: l.email,
         ebsiWalletProvider: "ds",
+        devSignerAddress: devSignerAddressForWallet(l.walletAddress),
         lawyerProfile: {
           create: {
             city: l.city,
             headline: l.headline,
             bio: l.bio,
-            specialties: l.specialties,
-            languages: l.languages,
-            jurisdictions: l.jurisdictions,
-            tags: l.tags,
+            specialties: stringifyStrArray(l.specialties),
+            languages: stringifyStrArray(l.languages),
+            jurisdictions: stringifyStrArray(l.jurisdictions),
+            tags: stringifyStrArray(l.tags),
             pricingKind: l.pricingKind,
             pricingHeadline: l.pricingHeadline,
             hourlyRateEUR: l.hourlyRateEUR,
@@ -404,10 +493,11 @@ async function main() {
             pricingItems: l.pricingItems,
             yearsExperience: l.yearsExperience,
             verificationStatus: l.verificationStatus,
+            capabilityUid,
             barRegistrationNum: l.barRegistrationNum,
             barJurisdiction: l.barJurisdiction,
             admissionDate: l.admissionDate,
-            credentialDocsUrl: [],
+            credentialDocsUrl: stringifyStrArray([]),
             rating: l.rating,
             reviewCount: l.reviewCount,
           },
@@ -417,14 +507,27 @@ async function main() {
   }
 
   console.log("[seed] Creating sample clients …");
+  const clientSeeds = [
+    { wallet: "0x2222000000000000000000000000000000000001", name: "Sarah Mueller", email: "sarah.mueller@example.eu" },
+    { wallet: "0x2222000000000000000000000000000000000002", name: "James O'Connor", email: "james.oconnor@example.eu" },
+    { wallet: "0x2222000000000000000000000000000000000003", name: "Léa Bernard", email: "lea.bernard@example.eu" },
+    { wallet: "0x2222000000000000000000000000000000000004", name: "David Cohen", email: "david.cohen@example.eu" },
+  ];
+  // Mock-chain SCHEMA_CLIENT capability per seeded client (F2). Mint the
+  // capability first, then create the User row with `clientCapabilityUid`
+  // pointing back to it — keeps the gate + UI state lined up.
   const clients = await Promise.all(
-    [
-      { wallet: "0x2222000000000000000000000000000000000001", name: "Sarah Mueller", email: "sarah.mueller@example.eu" },
-      { wallet: "0x2222000000000000000000000000000000000002", name: "James O'Connor", email: "james.oconnor@example.eu" },
-      { wallet: "0x2222000000000000000000000000000000000003", name: "Léa Bernard", email: "lea.bernard@example.eu" },
-      { wallet: "0x2222000000000000000000000000000000000004", name: "David Cohen", email: "david.cohen@example.eu" },
-    ].map((c) =>
-      prisma.user.create({
+    clientSeeds.map(async (c) => {
+      const uid = fakeAttestationUid();
+      await prisma.capability.create({
+        data: {
+          subjectAddress: c.wallet.toLowerCase(),
+          schemaId: "SCHEMA_CLIENT",
+          attestationUid: uid,
+          claims: JSON.stringify({ countryOfResidence: "EU", ageOver18: true }),
+        },
+      });
+      return prisma.user.create({
         data: {
           walletAddress: c.wallet.toLowerCase(),
           role: Role.CLIENT,
@@ -432,9 +535,11 @@ async function main() {
           email: c.email,
           ebsiWalletProvider: "ekibis",
           ageVerifiedAt: new Date(),
+          clientCapabilityUid: uid,
+          devSignerAddress: devSignerAddressForWallet(c.wallet),
         },
-      }),
-    ),
+      });
+    }),
   );
 
   console.log("[seed] Creating sample bookings + conversations …");

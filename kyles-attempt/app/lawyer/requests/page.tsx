@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookingStatus } from "@prisma/client";
+import { BookingStatus } from "@/lib/db/enums";
 import { prisma } from "@/lib/db/client";
 import { requireLawyer } from "@/lib/auth/session";
 import { AppTopBar } from "@/components/layout/app-top-bar";
@@ -19,6 +19,19 @@ export default async function LawyerRequestsListPage() {
       })
     : [];
 
+  // F3: pull the proposal state for each request (the on-chain mirror of the
+  // Funded escrow). Cheaper to do one batch query than N+1; the route is
+  // already lightweight so this stays well under our render budget.
+  const engagementIds = requests
+    .map((r) => r.engagementId)
+    .filter((x): x is number => x != null);
+  const proposalRows = engagementIds.length
+    ? await prisma.proposal.findMany({
+        where: { engagementId: { in: engagementIds }, proposalIndex: 0 },
+      })
+    : [];
+  const proposalByEngagement = new Map(proposalRows.map((p) => [p.engagementId, p]));
+
   return (
     <div className="min-h-screen bg-white-50">
       <AppTopBar user={session.user} active="requests" />
@@ -37,24 +50,39 @@ export default async function LawyerRequestsListPage() {
           </div>
         ) : (
           <ul className="mt-8 divide-y divide-slate-100 rounded-xl border border-slate-100 bg-white-0">
-            {requests.map((r) => (
-              <li key={r.id}>
-                <Link href={`/lawyer/requests/${r.id}`} className="flex items-start justify-between gap-4 p-5 hover:bg-white-50">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                      <span>{r.practiceArea}</span>
-                      <span className="text-slate-200">·</span>
-                      <span className="font-mono">{anonymousClientId(r.client.walletAddress)}</span>
+            {requests.map((r) => {
+              const proposal = r.engagementId != null ? proposalByEngagement.get(r.engagementId) : undefined;
+              const proposalState = proposal?.state ?? null;
+              return (
+                <li key={r.id}>
+                  <Link href={`/lawyer/requests/${r.id}`} className="flex items-start justify-between gap-4 p-5 hover:bg-white-50">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                        <span>{r.practiceArea}</span>
+                        <span className="text-slate-200">·</span>
+                        <span className="font-mono">{anonymousClientId(r.client.walletAddress)}</span>
+                        {proposalState && (
+                          <>
+                            <span className="text-slate-200">·</span>
+                            <span className="font-mono uppercase tracking-wider">
+                              proposal: {proposalState.toLowerCase()}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <div className="mt-1 line-clamp-1 text-[15px] font-medium text-navy-900">{r.caseDescription}</div>
+                      <div className="mt-1.5 text-[12px] text-slate-500">
+                        {formatScheduled(r.scheduledAt)} · {r.durationMinutes} min · {formatEUR(Number(r.consultationFeeEUR))}
+                        {proposal && proposalState === "FUNDED" && (
+                          <span className="ml-2 font-medium text-teal-700">· Funds in escrow</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="mt-1 line-clamp-1 text-[15px] font-medium text-navy-900">{r.caseDescription}</div>
-                    <div className="mt-1.5 text-[12px] text-slate-500">
-                      {formatScheduled(r.scheduledAt)} · {r.durationMinutes} min · {formatEUR(Number(r.consultationFeeEUR))}
-                    </div>
-                  </div>
-                  <Badge kind="pending">Review</Badge>
-                </Link>
-              </li>
-            ))}
+                    <Badge kind="pending">Review</Badge>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
       </main>

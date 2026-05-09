@@ -1,4 +1,4 @@
-import { PricingKind } from "@prisma/client";
+import { PricingKind } from "@/lib/db/enums";
 import { cn } from "@/lib/utils/cn";
 
 const MAP: Record<PricingKind, { bg: string; fg: string; label: string }> = {

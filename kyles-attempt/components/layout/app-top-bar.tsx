@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
-import { Role } from "@prisma/client";
+import { Role } from "@/lib/db/enums";
 import { FirmusLogo } from "@/components/firmus/firmus-logo";
 import { AvatarBubble } from "@/components/firmus/avatar-bubble";
 import { WalletButton } from "@/components/firmus/wallet-button";

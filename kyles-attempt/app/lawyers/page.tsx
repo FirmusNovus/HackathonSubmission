@@ -1,6 +1,9 @@
-import { Prisma, PricingKind, VerificationStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { PricingKind } from "@/lib/db/enums";
 import { Search } from "lucide-react";
 import { prisma } from "@/lib/db/client";
+import { containsValue, expandLawyerProfile } from "@/lib/db/json-array";
+import { SCHEMA_LAWYER } from "@/lib/chain/schemas";
 import { MarketingNav } from "@/components/layout/marketing-nav";
 import { Footer } from "@/components/layout/footer";
 import { LawyerCard } from "@/components/firmus/lawyer-card";
@@ -29,22 +32,46 @@ export default async function LawyerDirectoryPage({ searchParams }: { searchPara
   const langs = asArray(sp.lang);
   const pricingKinds = asArray(sp.pricing).filter((k): k is PricingKind => k in PricingKind);
 
-  const where: Prisma.LawyerProfileWhereInput = { verificationStatus: VerificationStatus.VERIFIED };
-  if (practice.length) where.tags = { hasSome: practice };
-  if (langs.length) where.languages = { hasSome: langs };
+  // F2: directory filter is "active SCHEMA_LAWYER capability" — the column
+  // stays for UI badge reads, but the WHERE here goes through the capability
+  // wallet set. See app/api/lawyers/route.ts for the same shape.
+  const now = new Date();
+  const activeCaps = await prisma.capability.findMany({
+    where: {
+      schemaId: SCHEMA_LAWYER,
+      revokedAt: null,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+    select: { subjectAddress: true },
+  });
+  const verifiedWallets = activeCaps.map((c) => c.subjectAddress);
+
+  // SQLite stores `tags` / `languages` as JSON-encoded strings, so array
+  // membership becomes a substring match against the quoted value.
+  const ANDs: Prisma.LawyerProfileWhereInput[] = [];
+  if (practice.length) ANDs.push({ OR: practice.map((p) => ({ tags: containsValue(p) })) });
+  if (langs.length) ANDs.push({ OR: langs.map((l) => ({ languages: containsValue(l) })) });
+
+  const where: Prisma.LawyerProfileWhereInput = {
+    user: { walletAddress: { in: verifiedWallets } },
+    ...(ANDs.length ? { AND: ANDs } : {}),
+  };
   if (pricingKinds.length) where.pricingKind = { in: pricingKinds };
   if (q)
     where.OR = [
-      { headline: { contains: q, mode: "insensitive" } },
-      { bio: { contains: q, mode: "insensitive" } },
-      { user: { name: { contains: q, mode: "insensitive" } } },
+      { headline: { contains: q } },
+      { bio: { contains: q } },
+      { user: { name: { contains: q } } },
     ];
 
-  const lawyers = await prisma.lawyerProfile.findMany({
-    where,
-    include: { user: true },
-    orderBy: [{ rating: "desc" }, { reviewCount: "desc" }],
-  });
+  const rows = verifiedWallets.length
+    ? await prisma.lawyerProfile.findMany({
+        where,
+        include: { user: true },
+        orderBy: [{ rating: "desc" }, { reviewCount: "desc" }],
+      })
+    : [];
+  const lawyers = rows.map((l) => ({ ...expandLawyerProfile(l), user: l.user }));
 
   return (
     <>

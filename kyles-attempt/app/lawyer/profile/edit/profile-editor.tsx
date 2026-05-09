@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Check, Globe, Upload, X } from "lucide-react";
-import { PricingKind, VerificationStatus } from "@prisma/client";
+import { PricingKind, VerificationStatus } from "@/lib/db/enums";
 import { AvatarBubble } from "@/components/firmus/avatar-bubble";
 import { EBSIBadge } from "@/components/firmus/ebsi-badge";
 import { PricingBadge } from "@/components/firmus/pricing-badge";

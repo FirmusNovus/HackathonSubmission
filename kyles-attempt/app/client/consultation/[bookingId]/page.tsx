@@ -12,6 +12,31 @@ export default async function ClientConsultationPage({ params }: { params: Promi
   });
   if (!booking) notFound();
 
+  // F3: pull the linked Engagement + Proposal for the room's right-rail.
+  const engagementRow =
+    booking.engagementId != null
+      ? await prisma.engagement.findUnique({
+          where: { engagementId: booking.engagementId },
+          include: { proposals: { where: { proposalIndex: booking.proposalIndex } } },
+        })
+      : null;
+  const engagement = engagementRow
+    ? {
+        id: engagementRow.engagementId,
+        state: engagementRow.state,
+        proposalCount: engagementRow.proposalCount,
+        transcriptRoot: engagementRow.transcriptRoot,
+      }
+    : null;
+  const proposalRow = engagementRow?.proposals[0] ?? null;
+  const proposal = proposalRow
+    ? {
+        state: proposalRow.state,
+        deliveredAt: proposalRow.deliveredAt ? proposalRow.deliveredAt.toISOString() : null,
+        amountWei: proposalRow.amountWei,
+      }
+    : null;
+
   return (
     <ConsultationRoom
       role="client"
@@ -22,8 +47,12 @@ export default async function ClientConsultationPage({ params }: { params: Promi
         practiceArea: booking.practiceArea,
         scheduledAt: booking.scheduledAt.toISOString(),
         durationMinutes: booking.durationMinutes,
+        consultationFeeEUR: Number(booking.consultationFeeEUR),
+        status: booking.status,
       }}
       conversationId={booking.conversation?.id ?? null}
+      engagement={engagement}
+      proposal={proposal}
     />
   );
 }

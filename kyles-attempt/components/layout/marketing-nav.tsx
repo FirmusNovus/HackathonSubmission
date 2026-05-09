@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Role } from "@prisma/client";
+import { Role } from "@/lib/db/enums";
 import { auth } from "@/lib/auth/config";
 import { FirmusLogo } from "@/components/firmus/firmus-logo";
 import { WalletButton } from "@/components/firmus/wallet-button";
@@ -23,7 +23,7 @@ interface MarketingNavProps {
 const PUBLIC_ITEMS: Array<{ key: ActiveKey; label: string; href: string }> = [
   { key: "lawyers", label: "Lawyers", href: "/lawyers" },
   { key: "how", label: "How It Works", href: "/#how" },
-  { key: "for-lawyers", label: "For Lawyers", href: "/connect?role=lawyer" },
+  { key: "for-lawyers", label: "For Lawyers", href: "/connect" },
 ];
 
 const CLIENT_ITEMS: Array<{ key: ActiveKey; label: string; href: string }> = [

@@ -2,14 +2,16 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/db/client";
+import { expandLawyerProfile } from "@/lib/db/json-array";
 import { requireLawyer } from "@/lib/auth/session";
 import { AppTopBar } from "@/components/layout/app-top-bar";
 import { ProfileEditor } from "./profile-editor";
 
 export default async function ProfileEditPage() {
   const session = await requireLawyer();
-  const profile = await prisma.lawyerProfile.findUnique({ where: { userId: session.user.id } });
-  if (!profile) redirect("/verify-lawyer");
+  const row = await prisma.lawyerProfile.findUnique({ where: { userId: session.user.id } });
+  if (!row) redirect("/verify-lawyer");
+  const profile = expandLawyerProfile(row);
 
   return (
     <div className="min-h-screen bg-white-50 pb-24">

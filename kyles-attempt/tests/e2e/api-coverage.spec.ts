@@ -156,7 +156,10 @@ test.describe("Authenticated endpoints — client role", () => {
     if (!bookings.length) test.skip();
     const detail = await page.request.get(`/api/bookings/${bookings[0].id}`);
     const { booking } = (await detail.json()) as { booking: { conversation?: { id: string } | null } };
-    if (!booking.conversation) test.skip();
+    if (!booking.conversation) {
+      test.skip();
+      return;
+    }
 
     const send = await page.request.post("/api/messages", {
       data: { conversationId: booking.conversation.id, content: "API coverage hello." },
@@ -183,7 +186,10 @@ test.describe("Authenticated endpoints — client role", () => {
     const detail = await other.request.get(`/api/bookings/${bookings[0].id}`);
     const { booking } = (await detail.json()) as { booking: { conversation?: { id: string } | null } };
     await ctx.close();
-    if (!booking.conversation) test.skip();
+    if (!booking.conversation) {
+      test.skip();
+      return;
+    }
 
     const r = await page.request.post("/api/messages", {
       data: { conversationId: booking.conversation.id, content: "should not be allowed" },
@@ -215,7 +221,10 @@ test.describe("Authenticated endpoints — client role", () => {
     const list = await page.request.get("/api/bookings");
     const { bookings } = (await list.json()) as { bookings: Array<{ id: string; status: string }> };
     const target = bookings.find((b) => b.status === "ACCEPTED");
-    if (!target) test.skip();
+    if (!target) {
+      test.skip();
+      return;
+    }
     const r = await page.request.post(`/api/bookings/${target.id}/complete`);
     expect(r.status()).toBe(200);
     const data = (await r.json()) as { booking: { status: string } };
@@ -253,7 +262,7 @@ test.describe("Authenticated endpoints — lawyer role", () => {
     const r = await page.request.get("/api/verification");
     expect(r.status()).toBe(200);
     const data = (await r.json()) as { profile: { verificationStatus: string } | null };
-    expect(data.profile?.verificationStatus).toMatch(/PENDING|VERIFIED|REJECTED/);
+    expect(data.profile?.verificationStatus).toMatch(/PENDING|VERIFIED|REJECTED|REVOKED/);
   });
 
   test("POST /api/bookings/[id]/accept — flips REQUESTED → ACCEPTED", async ({ page, browser }) => {
@@ -269,6 +278,7 @@ test.describe("Authenticated endpoints — lawyer role", () => {
     if (!requested) {
       await ctx.close();
       test.skip();
+      return;
     }
     const ownerRes = await helper.request.get(`/api/lawyers/${requested.lawyerProfileId}`);
     const { lawyer } = (await ownerRes.json()) as { lawyer: { user: { walletAddress: string } } };

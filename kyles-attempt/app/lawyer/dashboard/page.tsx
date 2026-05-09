@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Briefcase, Calendar, FileText, MessageSquare, Plus, TrendingUp, Video } from "lucide-react";
-import { BookingStatus } from "@prisma/client";
+import { BookingStatus } from "@/lib/db/enums";
 import { prisma } from "@/lib/db/client";
 import { requireLawyer } from "@/lib/auth/session";
 import { AppTopBar } from "@/components/layout/app-top-bar";

@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# scripts/dev-up.sh — bring up the full Firmus Novus dev stack:
-#   1. Postgres (docker)
-#   2. Pending Prisma migrations
-#   3. Database seed (only if empty)
-#   4. Next.js dev server on http://localhost:3000
+# scripts/dev-up.sh — bring up the Firmus Novus dev stack on SQLite:
+#   1. Pending Prisma migrations (creates prisma/dev.db on first run)
+#   2. Database seed (only if empty)
+#   3. Next.js dev server on http://localhost:3000
 #
 # Usage:
 #   ./scripts/dev-up.sh           # bring up everything; tail dev server in foreground
 #   ./scripts/dev-up.sh --reset   # also wipe + reseed the DB
-#   ./scripts/dev-up.sh --no-dev  # bring up DB only, skip starting Next.js
+#   ./scripts/dev-up.sh --no-dev  # apply migrations only, skip starting Next.js
 #
 # Stop everything with: ./scripts/dev-down.sh
 
@@ -39,9 +38,8 @@ warn() { printf "  \033[33m!\033[0m %s\n" "$*"; }
 die()  { printf "\n\033[31m✗ %s\033[0m\n" "$*" >&2; exit 1; }
 
 # --- 0. Sanity ---------------------------------------------------------------
-command -v docker >/dev/null || die "docker is not installed"
-command -v node   >/dev/null || die "node is not installed"
-command -v npm    >/dev/null || die "npm is not installed"
+command -v node >/dev/null || die "node is not installed"
+command -v npm  >/dev/null || die "npm is not installed"
 
 # --- 1. Env file -------------------------------------------------------------
 if [ ! -f .env ]; then
@@ -61,33 +59,14 @@ fi
 # shellcheck disable=SC1091
 set -a; . ./.env; set +a
 
-# --- 2. Postgres -------------------------------------------------------------
-step "Starting Postgres container"
-docker compose up -d
-ok "container is up"
-
-# Extract host:port from DATABASE_URL (postgres://user:pass@host:port/db?…)
-HOSTPORT=$(echo "$DATABASE_URL" | sed -E 's|^[^@]+@([^/]+)/.*|\1|')
-HOST=${HOSTPORT%:*}; PORT=${HOSTPORT#*:}
-
-step "Waiting for Postgres at $HOST:$PORT"
-for i in {1..30}; do
-  if docker compose exec -T postgres pg_isready -U firmus -d firmus_novus -h localhost >/dev/null 2>&1; then
-    ok "ready"
-    break
-  fi
-  sleep 1
-  if [ "$i" = 30 ]; then die "Postgres did not become ready within 30s"; fi
-done
-
-# --- 3. Install deps if missing ---------------------------------------------
+# --- 2. Install deps if missing ---------------------------------------------
 if [ ! -d node_modules ]; then
   step "Installing npm packages (first run)"
   npm install
   ok "deps installed"
 fi
 
-# --- 4. Migrations + seed ---------------------------------------------------
+# --- 3. Migrations + seed ---------------------------------------------------
 if [ "$RESET" = 1 ]; then
   step "Resetting database (--reset)"
   npx prisma migrate reset --force --skip-seed
@@ -107,8 +86,11 @@ SEED_NEEDED=0
 if [ "$RESET" = 1 ]; then
   SEED_NEEDED=1
 else
-  COUNT=$(docker compose exec -T postgres psql -U firmus -d firmus_novus -t -A -c \
-    'select count(*) from "LawyerProfile";' 2>/dev/null || echo "0")
+  COUNT=$(node -e "
+    const { PrismaClient } = require('@prisma/client');
+    const p = new PrismaClient();
+    p.lawyerProfile.count().then(c => { console.log(c); return p.\$disconnect(); }).catch(() => { console.log(0); });
+  " 2>/dev/null || echo "0")
   if [ "${COUNT:-0}" = "0" ]; then SEED_NEEDED=1; fi
 fi
 if [ "$SEED_NEEDED" = 1 ]; then
@@ -119,10 +101,10 @@ else
   ok "database already populated; skipping seed (use --reset to force)"
 fi
 
-# --- 5. Next.js dev server --------------------------------------------------
+# --- 4. Next.js dev server --------------------------------------------------
 if [ "$RUN_DEV" = 0 ]; then
   step "Skipping Next.js dev server (--no-dev)"
-  echo "Postgres is running on $HOST:$PORT — start the app yourself with: npm run dev"
+  echo "SQLite database is at prisma/dev.db — start the app yourself with: npm run dev"
   exit 0
 fi
 
@@ -134,7 +116,7 @@ if lsof -ti :3000 >/dev/null 2>&1; then
 fi
 
 step "Starting Next.js dev server on http://localhost:3000"
-echo "  (Ctrl-C exits the dev server but leaves Postgres running.)"
+echo "  (Ctrl-C exits the dev server; the SQLite file persists at prisma/dev.db.)"
 echo "  Stop everything with: ./scripts/dev-down.sh"
 echo
 exec npm run dev

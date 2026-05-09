@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { FileText, Send, Paperclip, X } from "lucide-react";
-import { Role as RoleEnum } from "@prisma/client";
+import { Role as RoleEnum } from "@/lib/db/enums";
 import { AvatarBubble } from "@/components/firmus/avatar-bubble";
 import { EBSIBadge } from "@/components/firmus/ebsi-badge";
 import { Button } from "@/components/ui/button";

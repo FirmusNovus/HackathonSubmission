@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# scripts/dev-down.sh — stop everything dev-up.sh started.
+# scripts/dev-down.sh — stop the dev server.
 #
 # Usage:
-#   ./scripts/dev-down.sh         # stop dev server + Postgres container
-#   ./scripts/dev-down.sh --wipe  # also delete the Postgres volume (data lost)
+#   ./scripts/dev-down.sh         # stop dev server (SQLite file preserved)
+#   ./scripts/dev-down.sh --wipe  # also delete prisma/dev.db (data lost)
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -27,11 +27,7 @@ if lsof -ti :3000 >/dev/null 2>&1; then
 fi
 
 if [ "$WIPE" = 1 ]; then
-  step "Tearing down Postgres + volume"
-  docker compose down -v
-  ok "container removed and data wiped"
-else
-  step "Stopping Postgres container"
-  docker compose down
-  ok "container stopped (data preserved)"
+  step "Removing SQLite database"
+  rm -f prisma/dev.db prisma/dev.db-journal
+  ok "database file removed"
 fi

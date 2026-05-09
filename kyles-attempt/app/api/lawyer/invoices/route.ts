@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { BookingStatus, Role } from "@prisma/client";
+import { BookingStatus, Role } from "@/lib/db/enums";
 import { prisma } from "@/lib/db/client";
 import { getCurrentUser } from "@/lib/auth/session";
 

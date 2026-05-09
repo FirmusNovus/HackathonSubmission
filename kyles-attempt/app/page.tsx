@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, MessageSquare, ShieldCheck, Lock } from "lucide-react";
-import { Role, VerificationStatus } from "@prisma/client";
+import { Role } from "@/lib/db/enums";
 import { prisma } from "@/lib/db/client";
+import { expandLawyerProfile } from "@/lib/db/json-array";
 import { auth } from "@/lib/auth/config";
+import { SCHEMA_LAWYER } from "@/lib/chain/schemas";
 import { MarketingNav } from "@/components/layout/marketing-nav";
 import { Footer } from "@/components/layout/footer";
 import { NetworkPattern } from "@/components/firmus/network-pattern";
@@ -21,12 +23,28 @@ export default async function LandingPage() {
     redirect(session.user.role === Role.LAWYER ? "/lawyer/dashboard" : "/client/home");
   }
 
-  const featured = await prisma.lawyerProfile.findMany({
-    where: { verificationStatus: VerificationStatus.VERIFIED },
-    include: { user: true },
-    orderBy: { createdAt: "desc" },
-    take: 3,
+  // F2: filter on active SCHEMA_LAWYER capability rather than the
+  // `verificationStatus` column. Two-step query: fetch the verified-lawyer
+  // wallet set first, then `findMany` with `user.walletAddress in (…)`.
+  const now = new Date();
+  const activeCaps = await prisma.capability.findMany({
+    where: {
+      schemaId: SCHEMA_LAWYER,
+      revokedAt: null,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+    select: { subjectAddress: true },
   });
+  const verifiedWallets = activeCaps.map((c) => c.subjectAddress);
+  const featuredRows = verifiedWallets.length
+    ? await prisma.lawyerProfile.findMany({
+        where: { user: { walletAddress: { in: verifiedWallets } } },
+        include: { user: true },
+        orderBy: { createdAt: "desc" },
+        take: 3,
+      })
+    : [];
+  const featured = featuredRows.map((l) => ({ ...expandLawyerProfile(l), user: l.user }));
 
   return (
     <>

@@ -11,7 +11,7 @@ test.describe("Public marketing surfaces", () => {
     // Marketing nav links
     await expect(page.getByRole("link", { name: "Lawyers" }).first()).toHaveAttribute("href", "/lawyers");
     await expect(page.getByRole("link", { name: /How It Works/i }).first()).toHaveAttribute("href", /#how/);
-    await expect(page.getByRole("link", { name: /For Lawyers/i }).first()).toHaveAttribute("href", /role=lawyer/);
+    await expect(page.getByRole("link", { name: /For Lawyers/i }).first()).toHaveAttribute("href", "/connect");
     // Exactly one Sign In affordance — the WalletButton CTA in the top right.
     const signIn = page.getByRole("link", { name: /^Sign In$/i });
     await expect(signIn).toHaveCount(1);

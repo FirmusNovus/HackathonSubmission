@@ -1,47 +1,30 @@
-// Firmus Novus — database schema
-// Tokenized EUR is the platform's user-facing currency. All monetary fields use Decimal(10,2).
+// Firmus Novus — database schema (SQLite).
+// Tokenized EUR is the platform's user-facing currency.
+//
+// SQLite notes (vs the original Postgres schema):
+//   - Native enums are unsupported, so role / status / pricing-kind columns are
+//     plain `String` and validated by TS-side const objects in `lib/db/enums.ts`.
+//   - Scalar arrays (`String[]`) are unsupported, so list-shaped fields
+//     (`specialties`, `languages`, `jurisdictions`, `tags`, `credentialDocsUrl`)
+//     are stored as JSON-encoded strings. Read/write helpers live in
+//     `lib/db/json-array.ts`.
+//   - `Decimal` retains exact-arithmetic semantics; the Postgres-only
+//     `@db.Decimal(10, 2)` annotation is dropped.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
-}
-
-enum Role {
-  CLIENT
-  LAWYER
-}
-
-enum VerificationStatus {
-  PENDING
-  VERIFIED
-  REJECTED
-}
-
-enum BookingStatus {
-  REQUESTED
-  ACCEPTED
-  DECLINED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-  DISPUTED
-}
-
-enum PricingKind {
-  HOURLY
-  FIXED
-  SUBSCRIPTION
-  SUCCESS
 }
 
 model User {
   id                 String    @id @default(cuid())
   walletAddress      String    @unique
-  role               Role
+  // Role: "CLIENT" | "LAWYER" — enforced by lib/db/enums.ts.
+  role               String
   email              String?   @unique
   name               String?
   avatarUrl          String?
@@ -50,6 +33,17 @@ model User {
   ebsiWalletProvider String?
   // Set after the Over18 EBSI VC is shared during client onboarding.
   ageVerifiedAt      DateTime?
+  // Latest SCHEMA_CLIENT attestation UID (F2). Pointer into Capability.
+  // Refreshed by the onboarding/attest-client API and invalidated when the
+  // operator revokes the capability. Nullable for users that never went
+  // through age-check (e.g. lawyer-role accounts).
+  clientCapabilityUid String? @unique
+  // F4 dev-only mirror of the secp256k1 address derived from the deterministic
+  // seeded private key (see `devSignerAddressForWallet` in lib/chain/eip712).
+  // Real wallets leave this null and EIP-712 verification recovers to
+  // `walletAddress`. Null for production users; populated by the seed for
+  // every persona that needs to sign typed data in dev/test.
+  devSignerAddress    String?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -68,36 +62,49 @@ model Nonce {
 }
 
 model LawyerProfile {
-  id                 String             @id @default(cuid())
-  userId             String             @unique
-  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   city               String
   headline           String
   bio                String
-  specialties        String[]
-  languages          String[]
-  jurisdictions      String[]
-  pricingKind        PricingKind
+  // JSON-encoded string[] (see lib/db/json-array.ts).
+  specialties        String   @default("[]")
+  languages          String   @default("[]")
+  jurisdictions      String   @default("[]")
+  tags               String   @default("[]")
+  // PricingKind: "HOURLY" | "FIXED" | "SUBSCRIPTION" | "SUCCESS".
+  pricingKind        String
   // Display string ("€240 / hr", "from €450", "€890 / mo", "No win, no fee").
   pricingHeadline    String
-  hourlyRateEUR      Decimal            @db.Decimal(10, 2)
-  consultationRate30 Decimal            @db.Decimal(10, 2)
-  consultationRate60 Decimal            @db.Decimal(10, 2)
+  hourlyRateEUR      Decimal
+  consultationRate30 Decimal
+  consultationRate60 Decimal
   // Service packages for non-hourly lawyers: [{ title, desc, price, unit }]
-  pricingItems       Json               @default("[]")
+  pricingItems       Json     @default("[]")
   yearsExperience    Int
-  verificationStatus VerificationStatus @default(PENDING)
+  // VerificationStatus: "PENDING" | "VERIFIED" | "REJECTED" | "REVOKED".
+  // F2: this column is now DERIVED from the SCHEMA_LAWYER capability state
+  // (see lib/auth/capability.ts#lawyerVerificationFromCapability). Admin
+  // VERIFY/REVOKE actions write both the column and the capability so they
+  // stay in sync; the directory + profile read paths now filter on capability,
+  // not on this column.
+  verificationStatus String   @default("PENDING")
   ebsiCredentialId   String?
+  // Latest SCHEMA_LAWYER attestation UID (F2). Pointer into Capability;
+  // mirrors A's `verified_users.attestation_uid` from `apps/platform/lib/db.ts`.
+  // Cleared on REVOKE.
+  capabilityUid      String?  @unique
   barRegistrationNum String
   barJurisdiction    String
   admissionDate      DateTime
-  credentialDocsUrl  String[]
-  rating             Float              @default(0)
-  reviewCount        Int                @default(0)
+  // JSON-encoded string[].
+  credentialDocsUrl  String   @default("[]")
+  rating             Float    @default(0)
+  reviewCount        Int      @default(0)
   availability       Json?
-  tags               String[]
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   bookings Booking[]
 }
@@ -118,11 +125,32 @@ model Booking {
   deliverables       Json          @default("[]")
   clientAcceptedAt   DateTime?
   lawyerAcceptedAt   DateTime?
-  consultationFeeEUR Decimal       @db.Decimal(10, 2)
-  platformFeeEUR     Decimal       @db.Decimal(10, 2)
-  status             BookingStatus @default(REQUESTED)
+  consultationFeeEUR Decimal
+  platformFeeEUR     Decimal
+  // BookingStatus: "REQUESTED" | "ACCEPTED" | "DECLINED" | "IN_PROGRESS"
+  // | "DELIVERED" | "COMPLETED" | "CANCELLED" | "DISPUTED".
+  // F3: "DELIVERED" added — set when Proposal[0] flips to DELIVERED. The UI
+  // surfaces it as "Delivered — awaiting client release" on the lawyer side.
+  status             String        @default("REQUESTED")
   caseDescription    String
   practiceArea       String
+  // F3: link Booking <-> Engagement (1:1) and to a specific Proposal index.
+  // engagementId is the on-chain integer (also the unique key on Engagement
+  // mirror). Nullable for legacy / unfunded bookings (e.g. created before F3
+  // or where chain open failed). proposalIndex is the consultation proposal
+  // (always 0 today; F4 introduces follow-ups as separate Proposal rows under
+  // the same Engagement, each with its own UI surface — but the Booking-as-
+  // shell remains 1:1 with the engagement-opening proposal).
+  engagementId       Int?          @unique
+  proposalIndex      Int           @default(0)
+  // Mirror of Proposal.deliveredAt for fast UI reads (lawyer dashboard).
+  // Authoritative copy lives on Proposal; this column is updated by the
+  // booking-bridge on `markDelivered`.
+  deliveredAt        DateTime?
+  // F3: now populated from real Proposal tx hashes. The semantics also shift —
+  // escrowTxHash is set at booking-creation time (the open-and-fund tx),
+  // not at lawyer-accept time, mirroring System A's escrow-funded-at-open
+  // contract semantic.
   escrowTxHash       String?
   escrowReleaseHash  String?
   notes              String?
@@ -155,4 +183,286 @@ model Message {
   createdAt      DateTime     @default(now())
 
   @@index([conversationId, createdAt])
+}
+
+// =============================================================================
+// On-chain mirror (Feature 1 — chain foundation).
+//
+// These models mirror the state of `LegalEngagementEscrow.sol` +
+// `AttestationManager.sol` from System A. For now the "chain" is mocked by
+// `lib/chain/`; later features replace the mock with viem `writeContract`
+// calls and an indexer. Existing Booking/Conversation/Message tables are
+// untouched — they continue to drive the UI in F1; F3+ migrate Booking flows
+// onto Engagement+Proposal.
+// =============================================================================
+
+// Mirrors `LegalEngagementEscrow.Engagement`.
+//   state ∈ "NONE" | "ACTIVE" | "CLOSED" (validated TS-side; SQLite has no enums).
+//   transcriptRoot is bytes32 hex; default is `0x000…0` (32 zero bytes).
+//   proposalCount is the contract-side counter; engagementId is the on-chain
+//   uint256 sequence (1-indexed in the contract via `++nextEngagementId`).
+model Engagement {
+  id                   String     @id @default(cuid())
+  // Mirrors uint256 engagementId; sequence-counted from 1.
+  engagementId         Int        @unique
+  // Off-chain references to the User table — the source of truth for who
+  // those addresses belong to lives in `User.walletAddress`. We index both
+  // sides so dashboard queries stay cheap.
+  clientUserId         String
+  lawyerUserId         String
+  // bytes32 hex (the contract's `matterRef`).
+  matterRef            String
+  // EngagementState: "NONE" | "ACTIVE" | "CLOSED".
+  state                String     @default("ACTIVE")
+  // bytes32 hex; updated on every TranscriptAnchored.
+  transcriptRoot       String     @default("0x0000000000000000000000000000000000000000000000000000000000000000")
+  proposalCount        Int        @default(0)
+  openedAt             DateTime   @default(now())
+  closedAt             DateTime?
+  openTxHash           String
+
+  proposals            Proposal[]
+
+  @@index([clientUserId])
+  @@index([lawyerUserId])
+}
+
+// Mirrors `LegalEngagementEscrow.Proposal`.
+//   state ∈ "NONE" | "FUNDED" | "DELIVERED" | "RELEASED" | "DISPUTED" | "RESOLVED" | "REFUNDED".
+//   amountWei is uint256 wei serialised as a base-10 string (BigInt).
+//   itemsHash + nonce + lawyerOfferSig are the off-chain `ProposalOffer` shape
+//   (EIP-712 typed-data) that backs `fundProposal` calldata. The contract
+//   itself doesn't see them; the platform API verifies them before submitting.
+model Proposal {
+  id                  String     @id @default(cuid())
+  engagement          Engagement @relation(fields: [engagementInternalId], references: [id], onDelete: Cascade)
+  engagementInternalId String
+  // Mirror of the on-chain (engagementId, proposalIndex) composite.
+  engagementId        Int
+  proposalIndex       Int
+  amountWei           String
+  // ProposalState above.
+  state               String     @default("FUNDED")
+  deliveredAt         DateTime?
+  // Resolution split (set on resolveDispute). Null until resolved.
+  amountToLawyerWei   String?
+  amountToClientWei   String?
+  // Off-chain offer artifacts (only present on follow-up funded proposals).
+  itemsHash           String?
+  nonce               String?
+  lawyerOfferSig      String?
+  // F4: pointer back to the ProposalOffer row that minted this proposal.
+  // Null for proposal[0] (consultation funding never goes through an offer)
+  // and for any future proposal materialised by another path.
+  offerNonce          String?
+  // Tx hashes for each state transition.
+  fundTxHash          String
+  deliverTxHash       String?
+  releaseTxHash       String?
+  disputeTxHash       String?
+  resolveTxHash       String?
+  refundTxHash        String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@unique([engagementId, proposalIndex])
+}
+
+// Mirrors `AttestationManager` capability attestations. One row per issuance.
+// "Latest valid" for a (subject, schemaId) pair is the most-recent row whose
+// revokedAt IS NULL and (expiresAt IS NULL OR expiresAt > now()).
+model Capability {
+  id              String    @id @default(cuid())
+  // Lower-cased Ethereum address.
+  subjectAddress  String
+  // SchemaId: "SCHEMA_LAWYER" | "SCHEMA_CLIENT" | "SCHEMA_OPERATOR".
+  schemaId        String
+  // Mock UID — `0x` + 64 hex chars; unique per attestation issuance.
+  attestationUid  String    @unique
+  // JSON-encoded shape varies per schema (see lib/chain/escrow.ts).
+  claims          String    @default("{}")
+  issuedAt        DateTime  @default(now())
+  revokedAt       DateTime?
+  expiresAt       DateTime?
+
+  @@index([subjectAddress, schemaId, revokedAt])
+}
+
+// Tracks consumed ZK conflict-of-interest nullifiers. The contract uses
+// `mapping(bytes32 => bool) usedNullifiers`; we mirror it relationally.
+model UsedNullifier {
+  id           String   @id @default(cuid())
+  nullifier    String   @unique
+  engagementId Int
+  usedAt       DateTime @default(now())
+}
+
+// Tracks consumed proposal-offer EIP-712 nonces. Production parity with A:
+// each offer carries a fresh nonce that's burnt on `fundProposal` so a
+// signed offer can't be replayed for a second funding.
+model ConsumedProposalNonce {
+  id            String   @id @default(cuid())
+  nonce         String   @unique
+  engagementId  Int
+  proposalIndex Int
+  consumedAt    DateTime @default(now())
+}
+
+// One row per verified lawyer carrying their published conflict-root commitment
+// (`mapping(address => bytes32) lawyerConflictRoot`). Updated by setConflictRoot.
+model LawyerConflictRoot {
+  id             String   @id @default(cuid())
+  lawyerAddress  String   @unique
+  root           String
+  updatedAt      DateTime @updatedAt
+}
+
+// EIP-712 mutual-refund authorisations. Both parties' sigs over the same
+// digest. One row per (engagementId, proposalIndex) — the on-chain Funded →
+// Refunded transition is single-shot, so we enforce uniqueness here too.
+//
+// F6 deviation from F1's schema: the `nonce` column is OPTIONAL. F1 stamped
+// a server-side nonce per refund as a replay guard, but A's contract
+// `MUTUAL_REFUND_TYPEHASH` does NOT include a nonce — single-shot replay
+// safety comes for free from the Funded → Refunded state-machine transition
+// (a second refund call on the same (engagementId, proposalIndex) trips
+// `InvalidProposalState` because the proposal is no longer Funded). We keep
+// the column nullable rather than dropping it so the F1 migration history
+// stays intact and any pre-F6 rows remain readable; new rows leave it null.
+model MutualRefundAuth {
+  id            String   @id @default(cuid())
+  engagementId  Int
+  proposalIndex Int
+  clientSig     String
+  lawyerSig     String
+  nonce         String?
+  createdAt     DateTime @default(now())
+
+  @@unique([engagementId, proposalIndex])
+}
+
+// F6: a mutual-refund REQUEST collects both parties' EIP-712 signatures over
+// the (engagementId, proposalIndex) typed-data shape before submission. One
+// party initiates (storing their sig); the counterparty either approves
+// (storing the second sig) or rejects. Once both sigs are present, either
+// party may submit the authorisation to the chain via mutualRefundProposal.
+//
+// Status transitions:
+//   PENDING       — initiator signed; awaiting counterparty.
+//   SIGNED_BOTH   — both sigs present; awaiting submit.
+//   SUBMITTED     — submitted to chain; mutualRefundAuthId points at the row
+//                   that was minted by the chain call.
+//   REJECTED      — counterparty rejected (or initiator cancelled).
+//
+// Multiple rows may exist per (engagementId, proposalIndex) — earlier
+// REJECTED rows stay around for audit, only one PENDING/SIGNED_BOTH row
+// makes sense at a time but we don't hard-enforce that at the DB level
+// (the API layer guards against it).
+model MutualRefundRequest {
+  id            String   @id @default(cuid())
+  engagementId  Int
+  proposalIndex Int
+  // Role: "CLIENT" | "LAWYER" — who started the request.
+  initiatedBy   String
+  clientSig     String?
+  lawyerSig     String?
+  // "PENDING" | "SIGNED_BOTH" | "SUBMITTED" | "REJECTED".
+  status        String   @default("PENDING")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  submittedAt   DateTime?
+  // Tx hash of the chain submit. Null until status flips to SUBMITTED.
+  submitTxHash  String?
+
+  @@index([engagementId, proposalIndex, status])
+}
+
+// Append-only log of every event the mock chain "emits". Every mutation in
+// `lib/chain/escrow.ts` wraps its writes in a Prisma transaction and appends
+// one ChainEvent per emitted event; the indexer (`lib/chain/indexer.ts`) is
+// then a sanity-check that replays from these into the mirror tables.
+//
+//   kind ∈ "EngagementOpened" | "ProposalFunded" | "ProposalDelivered"
+//        | "ProposalReleased" | "ProposalDisputed" | "ProposalResolved"
+//        | "ProposalMutuallyRefunded" | "TranscriptAnchored" | "EngagementClosed"
+//        | "ConflictRootSet" | "Attested" | "Revoked".
+//   payload is JSON, mirroring the event args 1-to-1 by name.
+//   blockNumber comes from MockChainCounter.
+model ChainEvent {
+  id           String   @id @default(cuid())
+  engagementId Int?
+  kind         String
+  payload      String
+  txHash       String
+  blockNumber  Int
+  createdAt    DateTime @default(now())
+
+  @@index([engagementId, blockNumber])
+}
+
+// Per-engagement transcript-root history. The current root lives on
+// `Engagement.transcriptRoot`; this table records every TranscriptAnchored
+// event so a dispute arbiter can audit the path of roots over time.
+model TranscriptRootHistory {
+  id           String   @id @default(cuid())
+  engagementId Int
+  root         String
+  blockNumber  Int
+  anchoredAt   DateTime @default(now())
+
+  @@index([engagementId, blockNumber])
+}
+
+// Singleton row (id = "default") that hands out monotonic block numbers and
+// engagement-ids to the mock chain. Real chains don't need this — viem reads
+// `block.number` and the contract owns its own counter — but for the in-DB
+// mock we want a single source of truth so two concurrent calls can't clash.
+model MockChainCounter {
+  id              String   @id @default("default")
+  nextBlock       Int      @default(1)
+  nextEngagement  Int      @default(1)
+  updatedAt       DateTime @updatedAt
+}
+
+// EIP-712-signed follow-up proposal offers (F4). The lawyer composes line
+// items + deliverables, signs the canonical (engagementId, amount,
+// itemsHash, nonce) typed-data, and posts the envelope to the platform.
+// The client materialises one of these by calling `fundProposal`, which
+// burns the nonce + creates a new Proposal row.
+//
+//   amountWei   : decimal-string wei (sum of line-item subtotals × 100, mock).
+//   itemsHash   : 0x-prefixed sha256 of the canonical (items, deliverables).
+//   itemsJson   : the canonical JSON the hash was computed over (snapshot
+//                 so the consumer can render the offer without re-deriving).
+//   nonce       : 0x-prefixed 32 bytes — uniqueness enforced platform-side
+//                 AND on-chain via `ConsumedProposalNonce`.
+//   lawyerSig   : 65-byte (r||s||v) hex.
+//   lawyerAddress : recovered + asserted signer (lower-cased).
+//   consumedAt  : non-null after fundProposal mints the Proposal row.
+//   clientNote  : optional message attached to the offer for the UX.
+model ProposalOffer {
+  id              String    @id @default(cuid())
+  engagementId    Int
+  amountWei       String
+  itemsHash       String
+  itemsJson       String
+  nonce           String    @unique
+  lawyerSig       String
+  lawyerAddress   String
+  clientNote      String?
+  consumedAt      DateTime?
+  consumedTxHash  String?
+  consumedProposalIndex Int?
+  createdAt       DateTime  @default(now())
+
+  @@index([engagementId, consumedAt])
+}
+
+// Singleton row (id = "default") that holds the dev-only clock offset. Set
+// by `__skipTime(seconds)` in tests / dev API endpoints to fast-forward the
+// 30-day lawyer dispute cooldown without waiting for wall-clock to advance.
+model MockClock {
+  id            String   @id @default("default")
+  offsetSeconds Int      @default(0)
+  updatedAt     DateTime @updatedAt
 }

@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { Calendar, MessageSquare, Search, Video } from "lucide-react";
-import { BookingStatus, VerificationStatus } from "@prisma/client";
+import { BookingStatus } from "@/lib/db/enums";
 import { prisma } from "@/lib/db/client";
+import { containsValue, expandLawyerProfile } from "@/lib/db/json-array";
 import { requireClient } from "@/lib/auth/session";
+import { SCHEMA_LAWYER } from "@/lib/chain/schemas";
 import { AppTopBar } from "@/components/layout/app-top-bar";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils/cn";
@@ -68,15 +70,29 @@ export default async function ClientHomePage({
     include: { lawyerProfile: { include: { user: true } } },
   });
 
-  const recommended = await prisma.lawyerProfile.findMany({
+  // F2: capability-as-source-of-truth filter (see app/lawyers/page.tsx).
+  const nowDate = new Date();
+  const activeCaps = await prisma.capability.findMany({
     where: {
-      verificationStatus: VerificationStatus.VERIFIED,
-      ...(cat !== "All" ? { tags: { has: cat } } : {}),
+      schemaId: SCHEMA_LAWYER,
+      revokedAt: null,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: nowDate } }],
     },
-    include: { user: true },
-    orderBy: [{ rating: "desc" }],
-    take: 6,
+    select: { subjectAddress: true },
   });
+  const verifiedWallets = activeCaps.map((c) => c.subjectAddress);
+  const recommendedRows = verifiedWallets.length
+    ? await prisma.lawyerProfile.findMany({
+        where: {
+          user: { walletAddress: { in: verifiedWallets } },
+          ...(cat !== "All" ? { tags: containsValue(cat) } : {}),
+        },
+        include: { user: true },
+        orderBy: [{ rating: "desc" }],
+        take: 6,
+      })
+    : [];
+  const recommended = recommendedRows.map((l) => ({ ...expandLawyerProfile(l), user: l.user }));
 
   const services = cat !== "All" ? CATEGORY_SERVICES[cat] ?? [] : [];
 
@@ -202,7 +218,8 @@ function ActiveConsultationCard({
   scheduledAt: Date;
   durationMinutes: number;
   consultationFeeEUR: number;
-  status: BookingStatus;
+  // Booking.status is `string` from Prisma (SQLite has no enums).
+  status: string;
 }) {
   const joinable = isJoinableNow(status, scheduledAt, durationMinutes);
   const reason = joinabilityReason(status, scheduledAt);

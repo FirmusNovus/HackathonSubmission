@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { PricingKind, Role } from "@prisma/client";
+import { PricingKind, Role } from "@/lib/db/enums";
 import { prisma } from "@/lib/db/client";
+import { stringifyStrArray } from "@/lib/db/json-array";
 import { getCurrentUser } from "@/lib/auth/session";
 
 // PATCH endpoint for lawyer-side profile edits. Only the fields a lawyer can change
@@ -32,11 +33,14 @@ export async function PATCH(request: Request) {
   const profile = await prisma.lawyerProfile.findUnique({ where: { userId: me.id } });
   if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
+  const { specialties, languages, jurisdictions, ...rest } = parsed.data;
   const updated = await prisma.lawyerProfile.update({
     where: { id: profile.id },
     data: {
-      ...parsed.data,
-      ...(parsed.data.specialties ? { tags: parsed.data.specialties.slice(0, 3) } : {}),
+      ...rest,
+      ...(specialties ? { specialties: stringifyStrArray(specialties), tags: stringifyStrArray(specialties.slice(0, 3)) } : {}),
+      ...(languages ? { languages: stringifyStrArray(languages) } : {}),
+      ...(jurisdictions ? { jurisdictions: stringifyStrArray(jurisdictions) } : {}),
     },
   });
   return NextResponse.json({ profile: updated });

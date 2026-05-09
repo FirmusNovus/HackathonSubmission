@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Role } from "@prisma/client";
+import { Role } from "@/lib/db/enums";
 import { prisma } from "@/lib/db/client";
 import { requireClient } from "@/lib/auth/session";
 import { AppTopBar } from "@/components/layout/app-top-bar";

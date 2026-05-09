@@ -1,20 +1,16 @@
 import { AuthShell } from "@/components/layout/auth-shell";
 import { ConnectFlow } from "./connect-flow";
 
-export default function ConnectPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ role?: string }>;
-}) {
+// Demo controls (mock identity picker, fake EUDI shortcut) are visible in
+// real dev OR when the Playwright webServer flips ENABLE_MOCK_AUTH on. Same
+// guard as /dev/sign-in so the two stay in lockstep.
+const showDemoControls =
+  process.env.NODE_ENV !== "production" || process.env.ENABLE_MOCK_AUTH === "true";
+
+export default function ConnectPage() {
   return (
     <AuthShell escapeHref="/">
-      <ConnectFlowAsync searchParams={searchParams} />
+      <ConnectFlow showDemoControls={showDemoControls} />
     </AuthShell>
   );
-}
-
-async function ConnectFlowAsync({ searchParams }: { searchParams: Promise<{ role?: string }> }) {
-  const sp = await searchParams;
-  const initialRole = sp.role === "lawyer" ? "lawyer" : "client";
-  return <ConnectFlow initialRole={initialRole} />;
 }

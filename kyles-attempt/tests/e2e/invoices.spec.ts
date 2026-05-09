@@ -4,7 +4,7 @@ import { devSignIn, reseedDatabase, SEEDED } from "./_helpers";
 test.beforeEach(reseedDatabase);
 
 test.describe("Invoice flow — both parties must sign before escrow funds", () => {
-  test("Client signs invoice on booking creation; escrow stays unfunded until lawyer signs", async ({
+  test("Client signs invoice on booking creation; escrow funds at booking time (F3)", async ({
     page,
     request,
   }) => {
@@ -39,14 +39,18 @@ test.describe("Invoice flow — both parties must sign before escrow funds", () 
         consultationFeeEUR: string;
         platformFeeEUR: string;
         escrowTxHash: string | null;
+        engagementId: number | null;
       };
     };
 
-    // Client signed; lawyer hasn't; status is REQUESTED; escrow not yet funded.
+    // F3: client commits funds at booking time. Status stays REQUESTED until
+    // the lawyer accepts (UX confirmation, not a chain action), but the
+    // engagement is open + Proposal[0] is FUNDED on the chain mirror.
     expect(booking.status).toBe("REQUESTED");
     expect(booking.clientAcceptedAt).not.toBeNull();
     expect(booking.lawyerAcceptedAt).toBeNull();
-    expect(booking.escrowTxHash).toBeNull();
+    expect(booking.escrowTxHash).not.toBeNull();
+    expect(booking.engagementId).not.toBeNull();
     // Server computed the total from the line items.
     expect(Number(booking.consultationFeeEUR)).toBe(300);
     expect(Number(booking.platformFeeEUR)).toBeCloseTo(15, 2);
@@ -109,7 +113,9 @@ test.describe("Invoice flow — both parties must sign before escrow funds", () 
     };
     expect(accepted.status).toBe("ACCEPTED");
     expect(accepted.lawyerAcceptedAt).not.toBeNull();
-    // Escrow funded only now, after both signatures.
+    // F3: escrow was funded at booking-creation time, not at accept time. The
+    // tx hash on the accepted row is unchanged from the create — it's the
+    // openEngagementAndFundFirstProposal tx that's been there since POST.
     expect(accepted.escrowTxHash).toBeTruthy();
   });
 
