@@ -207,7 +207,7 @@ const PID_SUBJECTS: PidSpec[] = [
   },
   {
     index: 6,
-    display_name: 'Demo Client',
+    display_name: 'Erika Mustermann',
     given_name: 'Erika',
     family_name: 'Mustermann',
     birth_given_name: 'Erika',

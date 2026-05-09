@@ -242,7 +242,7 @@ export const PERSONAS: Persona[] = [
   {
     index: 6,
     get walletAddress() { return addrAt(6); },
-    displayName: 'Demo Client',
+    displayName: 'Erika Mustermann',
     roles: ['client'],
     disclosed_attrs: {
       client: { country_of_residence: 'DE', age_equal_or_over_18: true },
