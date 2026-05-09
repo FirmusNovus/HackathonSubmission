@@ -1,123 +1,187 @@
 'use client';
 // Owner spec: 001-verified-legal-engagement.
+// Test issuer's persona picker. The credential is bound to the wallet's
+// holder key at offer-redemption time (OID4VCI cnf.jwk); no Ethereum address
+// is needed here. Pick which fictional person's credential you want and the
+// wwWallet handoff URL opens in a new tab.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-type Kind = 'pid' | 'bar';
+interface Persona {
+  name: string;
+  pidId: number | null;
+  barId: number | null;
+  jurisdiction: string | null;
+}
 
-const PERSONAS = [
-  { label: 'Anna Schmidt (lawyer 1)', index: 1 },
-  { label: 'Klaus Weber (lawyer 2)', index: 2 },
-  { label: 'Lucia Romero (lawyer 3)', index: 3 },
-  { label: 'Marco Bianchi (lawyer 4)', index: 4 },
-  { label: 'Pavel Novák (lawyer 5)', index: 5 },
-  { label: 'Demo Client (client 6)', index: 6 },
-];
+interface OfferResult {
+  wwwalletUrl: string;
+  offerUri: string;
+  persona?: { display_name: string };
+}
 
 export function CredentialPicker() {
-  const [address, setAddress] = useState('');
-  const [kind, setKind] = useState<Kind>('pid');
-  const [result, setResult] = useState<null | { wwwalletUrl: string; offerUri: string; persona?: { display_name: string } }>(null);
+  const [personas, setPersonas] = useState<Persona[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [latest, setLatest] = useState<{ persona: string; kind: 'pid' | 'bar'; result: OfferResult } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
-  async function pick(personaIndex: number) {
-    // The page can't sign-derive an address (browser doesn't have the mnemonic),
-    // so we ask the user to paste an address. To make the demo painless we
-    // fall back to listing the seeded display-names and address fragments at
-    // the bottom of the page in dev — but the form takes a full hex address.
-    setError('Paste a wallet address from the platform /dev/personas page (the page after picking a persona shows it).');
-  }
+  useEffect(() => {
+    fetch('/api/issuer/personas')
+      .then((r) => r.json())
+      .then((j: { personas: Persona[] }) => setPersonas(j.personas))
+      .catch((e) => setError(`Failed to load personas: ${(e as Error).message}`));
+  }, []);
 
-  async function submit() {
-    setBusy(true);
+  async function mint(persona: Persona, kind: 'pid' | 'bar') {
+    const personaId = kind === 'pid' ? persona.pidId : persona.barId;
+    if (personaId == null) return;
+    const key = `${persona.name}:${kind}`;
+    setBusy(key);
     setError(null);
-    setResult(null);
+    setLatest(null);
     try {
       const r = await fetch(`/api/issuer/${kind}/offer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subjectAddress: address }),
+        body: JSON.stringify({ personaId }),
       });
-      if (!r.ok) {
-        const j = (await r.json()) as { error?: string; detail?: string };
-        throw new Error(j.detail ?? j.error ?? 'failed');
-      }
-      const j = (await r.json()) as {
-        wwwalletUrl: string;
-        offerUri: string;
-        persona?: { display_name: string };
-      };
-      setResult(j);
+      const j = (await r.json()) as { error?: string; detail?: string } & OfferResult;
+      if (!r.ok) throw new Error(j.detail ?? j.error ?? 'failed');
+      window.open(j.wwwalletUrl, 'wwwallet', 'noopener,noreferrer');
+      setLatest({ persona: persona.name, kind, result: j });
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
+  if (personas === null) {
+    return <p style={{ color: '#64748b' }}>Loading personas…</p>;
+  }
+
   return (
-    <section style={{ marginTop: 24 }}>
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-        <fieldset style={{ border: '1px solid #cbd5e1', padding: 16, borderRadius: 8 }}>
-          <legend style={{ fontWeight: 600 }}>Credential</legend>
-          <label style={{ marginRight: 16 }}>
-            <input type="radio" name="kind" checked={kind === 'pid'} onChange={() => setKind('pid')} /> EU PID
-          </label>
-          <label>
-            <input type="radio" name="kind" checked={kind === 'bar'} onChange={() => setKind('bar')} /> Bar accreditation
-          </label>
-        </fieldset>
-      </div>
+    <section style={{ marginTop: 32 }}>
+      <h2 style={{ fontSize: 18, marginBottom: 4 }}>Pick a persona to receive credentials for</h2>
+      <p style={{ color: '#64748b', fontSize: 13, marginTop: 0 }}>
+        Each click creates a fresh credential offer and opens it in wwWallet. The credential
+        binds to your wallet's holder key when you accept the offer there.
+      </p>
 
-      <div style={{ marginTop: 16 }}>
-        <label style={{ display: 'block', fontWeight: 600 }}>Wallet address</label>
-        <input
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          placeholder="0x..."
-          style={{ width: '100%', padding: '8px 12px', fontFamily: 'monospace' }}
-        />
-        <p style={{ fontSize: 12, color: '#64748b' }}>
-          Paste an address that's seeded in the issuer's roster. Lawyers (anvil indices 1–5)
-          can request both PID + bar; the demo client (index 6) is PID-only.
-        </p>
-      </div>
-
-      <button
-        onClick={submit}
-        disabled={busy || !address}
+      <div
         style={{
           marginTop: 16,
-          padding: '8px 16px',
-          background: '#14b8a6',
-          color: '#fff',
-          border: 0,
-          borderRadius: 8,
-          cursor: 'pointer',
+          display: 'grid',
+          gap: 12,
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
         }}
       >
-        {busy ? 'Creating offer…' : 'Create credential offer'}
-      </button>
+        {personas.map((p) => (
+          <article
+            key={p.name}
+            style={{
+              border: '1px solid #cbd5e1',
+              borderRadius: 12,
+              padding: 16,
+              background: '#fff',
+            }}
+          >
+            <header style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <h3 style={{ margin: 0, fontSize: 16 }}>{p.name}</h3>
+              <span style={{ fontSize: 11, color: '#64748b' }}>
+                {p.barId ? 'lawyer' : 'client'}
+                {p.jurisdiction ? ` · ${p.jurisdiction}` : ''}
+              </span>
+            </header>
+            <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                onClick={() => mint(p, 'pid')}
+                disabled={!p.pidId || busy !== null}
+                style={btnPrimary(!p.pidId || busy !== null)}
+              >
+                {busy === `${p.name}:pid` ? 'Opening…' : 'Mint PID'}
+              </button>
+              {p.barId ? (
+                <button
+                  onClick={() => mint(p, 'bar')}
+                  disabled={busy !== null}
+                  style={btnSecondary(busy !== null)}
+                >
+                  {busy === `${p.name}:bar` ? 'Opening…' : 'Mint bar accreditation'}
+                </button>
+              ) : null}
+            </div>
+          </article>
+        ))}
+      </div>
 
-      {error ? <p style={{ color: '#ef4444', marginTop: 12 }}>Error: {error}</p> : null}
-
-      {result ? (
-        <section style={{ marginTop: 24, padding: 16, background: '#f5efd9', borderRadius: 8 }}>
-          <h3 style={{ marginTop: 0 }}>Offer ready for {result.persona?.display_name}</h3>
-          <p>
-            Open this URL in a browser tab to hand off to wwWallet:
+      {latest ? (
+        <section
+          style={{
+            marginTop: 24,
+            padding: 16,
+            background: '#e6faf7',
+            border: '1px solid #5ee0cd',
+            borderRadius: 8,
+          }}
+        >
+          <p style={{ margin: 0, fontWeight: 600, color: '#0b7a70' }}>
+            ✓ {latest.kind === 'pid' ? 'PID' : 'Bar'} offer for {latest.persona} opened in wwWallet.
           </p>
-          <a href={result.wwwalletUrl} target="wwwallet" style={{ wordBreak: 'break-all' }}>
-            {result.wwwalletUrl}
+          <p style={{ margin: '8px 0 0', fontSize: 12, color: '#475569' }}>
+            If the new tab didn't open (popup-blocker?), use this link:
+          </p>
+          <a
+            href={latest.result.wwwalletUrl}
+            target="wwwallet"
+            rel="noreferrer"
+            style={{ color: '#0e9488', wordBreak: 'break-all', fontSize: 12 }}
+          >
+            {latest.result.wwwalletUrl}
           </a>
-          <p style={{ fontSize: 12, color: '#64748b', marginTop: 12 }}>
-            Or scan the offerUri:
-            <br />
-            <code style={{ wordBreak: 'break-all' }}>{result.offerUri}</code>
-          </p>
         </section>
+      ) : null}
+
+      {error ? (
+        <p
+          style={{
+            color: '#ef4444',
+            marginTop: 16,
+            padding: 12,
+            background: '#fce9e9',
+            borderRadius: 6,
+          }}
+        >
+          Error: {error}
+        </p>
       ) : null}
     </section>
   );
+}
+
+function btnPrimary(disabled: boolean): React.CSSProperties {
+  return {
+    padding: '8px 14px',
+    background: disabled ? '#cbd5e1' : '#14b8a6',
+    color: '#fff',
+    border: 0,
+    borderRadius: 6,
+    cursor: disabled ? 'default' : 'pointer',
+    fontWeight: 600,
+    fontSize: 13,
+  };
+}
+
+function btnSecondary(disabled: boolean): React.CSSProperties {
+  return {
+    padding: '8px 14px',
+    background: '#fff',
+    color: '#0a1f44',
+    border: '1px solid #cbd5e1',
+    borderRadius: 6,
+    cursor: disabled ? 'default' : 'pointer',
+    fontWeight: 600,
+    fontSize: 13,
+  };
 }

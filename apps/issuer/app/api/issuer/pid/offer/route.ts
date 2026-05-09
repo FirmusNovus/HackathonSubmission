@@ -1,34 +1,26 @@
 // Owner spec: 001-verified-legal-engagement.
-// POST {subjectAddress} → creates a pre-auth offer + returns wwwallet handoff URL.
+// POST {personaId} → creates a pre-auth offer + returns wwWallet handoff URL.
+// The credential binds to the wallet's holder key (cnf.jwk) at the
+// /credential exchange step; no Ethereum address is needed at offer time.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { isAddress, type Address } from 'viem';
+import { z } from 'zod';
 import { createOffer } from '@firmus-novus/oid4vci';
 import { getDb } from '@/lib/db/client';
-import { findPidByAddress } from '@/lib/persona-lookup';
+import { findPidById } from '@/lib/persona-lookup';
 
 export const runtime = 'nodejs';
 
+const Body = z.object({ personaId: z.number().int().positive() });
+
 export async function POST(req: NextRequest) {
-  let body: { subjectAddress?: string };
-  try {
-    body = (await req.json()) as { subjectAddress?: string };
-  } catch {
-    body = {};
+  const parsed = Body.safeParse(await req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'missing personaId' }, { status: 400 });
   }
-  const subjectAddress = body.subjectAddress;
-  if (!subjectAddress || !isAddress(subjectAddress)) {
-    return NextResponse.json({ error: 'missing or invalid subjectAddress' }, { status: 400 });
-  }
-  const subject = findPidByAddress(subjectAddress as Address);
+  const subject = findPidById(parsed.data.personaId);
   if (!subject) {
-    return NextResponse.json(
-      {
-        error: 'no PID profile for this address',
-        detail: 'This wallet is not on the PID provider roster. Use a seeded persona.',
-      },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'unknown persona' }, { status: 404 });
   }
 
   const issuerHost = process.env.PUBLIC_HOSTNAME?.replace(/\/$/, '');
@@ -39,8 +31,8 @@ export async function POST(req: NextRequest) {
   const baseUrl = `${issuerHost}/api/issuer/pid`;
   const { offerId } = createOffer(getDb(), 'pid', subject.id);
   const offerUri = `${baseUrl}/credential-offer/${offerId}`;
-  const deepLink = `openid-credential-offer://?credential_offer_uri=${encodeURIComponent(offerUri)}`;
   const wwwalletUrl = `https://demo.wwwallet.org/cb?credential_offer_uri=${encodeURIComponent(offerUri)}`;
+  const deepLink = `openid-credential-offer://?credential_offer_uri=${encodeURIComponent(offerUri)}`;
 
   return NextResponse.json({
     offerId,

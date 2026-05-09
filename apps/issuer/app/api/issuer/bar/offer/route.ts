@@ -1,32 +1,31 @@
 // Owner spec: 001-verified-legal-engagement.
-// Bar offer endpoint — gates on the wallet being on the bar roster (FR-008).
+// POST {personaId} → creates a pre-auth offer + returns wwWallet handoff URL.
+// Bar credentials are roster-gated: only persona IDs that exist with
+// credential_type='bar' can mint. The platform UI only exposes lawyer
+// personas as bar mint targets.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { isAddress, type Address } from 'viem';
+import { z } from 'zod';
 import { createOffer } from '@firmus-novus/oid4vci';
 import { getDb } from '@/lib/db/client';
-import { findBarByAddress } from '@/lib/persona-lookup';
+import { findBarById } from '@/lib/persona-lookup';
 
 export const runtime = 'nodejs';
 
+const Body = z.object({ personaId: z.number().int().positive() });
+
 export async function POST(req: NextRequest) {
-  let body: { subjectAddress?: string };
-  try {
-    body = (await req.json()) as { subjectAddress?: string };
-  } catch {
-    body = {};
-  }
-  const subjectAddress = body.subjectAddress;
-  if (!subjectAddress || !isAddress(subjectAddress)) {
-    return NextResponse.json({ error: 'missing or invalid subjectAddress' }, { status: 400 });
+  const parsed = Body.safeParse(await req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'missing personaId' }, { status: 400 });
   }
 
-  const subject = findBarByAddress(subjectAddress as Address);
+  const subject = findBarById(parsed.data.personaId);
   if (!subject) {
     return NextResponse.json(
       {
         error: 'not on bar roster',
-        detail: 'This wallet is not admitted to a bar association in our records.',
+        detail: 'No bar accreditation on file for this persona.',
       },
       { status: 403 },
     );
@@ -40,8 +39,8 @@ export async function POST(req: NextRequest) {
   const baseUrl = `${issuerHost}/api/issuer/bar`;
   const { offerId } = createOffer(getDb(), 'bar', subject.id);
   const offerUri = `${baseUrl}/credential-offer/${offerId}`;
-  const deepLink = `openid-credential-offer://?credential_offer_uri=${encodeURIComponent(offerUri)}`;
   const wwwalletUrl = `https://demo.wwwallet.org/cb?credential_offer_uri=${encodeURIComponent(offerUri)}`;
+  const deepLink = `openid-credential-offer://?credential_offer_uri=${encodeURIComponent(offerUri)}`;
 
   return NextResponse.json({
     offerId,
