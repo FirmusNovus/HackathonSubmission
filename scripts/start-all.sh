@@ -2,11 +2,33 @@
 # Brings up the demo stack: anvil (port 8545), platform (3010), issuer (3001),
 # proxy (3000). Run `scripts/start-all-ngrok.sh` for the ngrok-fronted variant.
 # Owner spec: 001-verified-legal-engagement.
+#
+#   bash scripts/start-all.sh                # honor DEV_BYPASS_EUDI from .env
+#   bash scripts/start-all.sh --bypass       # force DEV_BYPASS_EUDI=1
+#   bash scripts/start-all.sh --no-bypass    # force DEV_BYPASS_EUDI=0
+#                                            # (full wwWallet flow; persona-pick disabled)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# Resolve project env (anvil mnemonic, public hostname, RPC).
+# Resolve project env first (anvil mnemonic, public hostname, RPC, default
+# DEV_BYPASS_EUDI). CLI flags below override the .env value for this run.
 set -a; source .env; set +a
+
+# Parse the bypass flag.
+for arg in "$@"; do
+  case "$arg" in
+    --bypass)    export DEV_BYPASS_EUDI=1 ;;
+    --no-bypass) export DEV_BYPASS_EUDI=0 ;;
+    -h|--help)   sed -n '2,11p' "$0"; exit 0 ;;
+    *) echo "unknown arg: $arg (expected --bypass / --no-bypass)" >&2; exit 1 ;;
+  esac
+done
+
+if [[ "${DEV_BYPASS_EUDI:-0}" == "1" ]]; then
+  echo "[start-all] DEV_BYPASS_EUDI=1 — persona picker active at /dev/personas"
+else
+  echo "[start-all] DEV_BYPASS_EUDI=0 — full wwWallet flow only (no persona picker)"
+fi
 
 mkdir -p .run-logs
 
@@ -33,5 +55,6 @@ if [[ ! -f apps/issuer/data/db.sqlite ]]; then
   pnpm -F @firmus-novus/issuer seed
 fi
 
-# Apps.
+# Apps. We exported DEV_BYPASS_EUDI ourselves; dotenv-cli does NOT override
+# existing env vars by default, so our explicit value wins inside `pnpm dev`.
 pnpm dev

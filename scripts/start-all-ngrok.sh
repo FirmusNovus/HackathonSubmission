@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Same as start-all.sh but also fronts the proxy with ngrok on PUBLIC_HOSTNAME.
 # Owner spec: 001-verified-legal-engagement.
+#
+#   bash scripts/start-all-ngrok.sh              # honor DEV_BYPASS_EUDI from .env
+#   bash scripts/start-all-ngrok.sh --bypass     # force DEV_BYPASS_EUDI=1
+#   bash scripts/start-all-ngrok.sh --no-bypass  # force DEV_BYPASS_EUDI=0
+#                                                # (full wwWallet flow; no persona picker)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 set -a; source .env; set +a
@@ -13,4 +18,5 @@ if ! pgrep -f "ngrok http" > /dev/null 2>&1; then
   sleep 3
 fi
 
-bash scripts/start-all.sh
+# Forward all flags to start-all.sh (--bypass / --no-bypass etc).
+bash scripts/start-all.sh "$@"
