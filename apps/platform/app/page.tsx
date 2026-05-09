@@ -47,6 +47,17 @@ export default function Landing() {
               <Link href="/connect?role=lawyer">I&apos;m a lawyer</Link>
             </Button>
           </div>
+          <p className="mt-6 text-xs text-slate-500">
+            Need a test credential to try the demo?{' '}
+            <a
+              href="/issuer/"
+              target="issuer"
+              rel="noreferrer"
+              className="text-teal-700 underline underline-offset-2 hover:text-teal-600"
+            >
+              Visit the test credential issuer →
+            </a>
+          </p>
         </section>
 
         <section className="bg-white-0 py-16">

@@ -1,82 +1,110 @@
 'use client';
 // Owner spec: 001-verified-legal-engagement.
-// Client onboarding flow: SIWE → present PID → write EAS attestation.
-// In dev-bypass mode the SIWE step is skipped and we use the persona-bound
-// session created via /api/dev/login.
+//
+// Three steps: connect wallet → SIWE → present PID credential.
+// Minting the credential is a separate concern hosted by the issuer process
+// (a separate institution) — link out to /issuer/ for users who don't have
+// the credential yet. The platform's only job here is verification.
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAccount, useSignMessage } from 'wagmi';
+import { SiweMessage } from 'siwe';
+import { CheckCircle2, ExternalLink, Hourglass } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { CheckCircle2, ExternalLink, Hourglass } from 'lucide-react';
+import { ConnectWallet } from '@/components/firmus/connect-wallet';
 
-interface SessionShape {
-  address: string;
-  isClient: boolean;
+interface PresentationResponse {
+  state: string;
+  wwwalletUrl: string;
+  deepLink: string;
 }
 
 export function ClientOnboardingFlow({ returnTo }: { returnTo: string }) {
   const router = useRouter();
-  const [session, setSession] = useState<SessionShape | null>(null);
-  const [step, setStep] = useState<'authenticate' | 'present-pid' | 'verifying' | 'done'>('authenticate');
-  const [presentation, setPresentation] = useState<{
-    state: string;
-    wwwalletUrl: string;
-    issuerOfferUrl?: string;
-  } | null>(null);
+  const { address, isConnected } = useAccount();
+  const { signMessageAsync } = useSignMessage();
+
+  const [signedIn, setSignedIn] = useState(false);
+  const [presentation, setPresentation] = useState<PresentationResponse | null>(null);
+  const [phase, setPhase] = useState<'idle' | 'siwe' | 'presenting' | 'verified'>('idle');
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Bootstrap server session on (re)connect.
   useEffect(() => {
+    if (!isConnected || !address) {
+      setSignedIn(false);
+      return;
+    }
+    let cancelled = false;
     fetch('/api/auth/siwe/session')
       .then((r) => r.json())
-      .then((j: { session: SessionShape | null }) => {
-        if (j.session) {
-          setSession(j.session);
-          if (j.session.isClient) setStep('done');
-          else setStep('present-pid');
+      .then((d: { session: { address: string; isClient: boolean } | null }) => {
+        if (cancelled) return;
+        if (d.session && d.session.address.toLowerCase() === address.toLowerCase()) {
+          setSignedIn(true);
+          if (d.session.isClient) setPhase('verified');
+        } else {
+          setSignedIn(false);
         }
       })
-      .catch(() => {});
-  }, []);
+      .catch(() => setSignedIn(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [isConnected, address]);
 
-  async function startPresentation() {
+  async function doSiwe() {
+    if (!address) return;
     setError(null);
+    setPhase('siwe');
+    try {
+      const nonceRes = await fetch('/api/auth/siwe/nonce');
+      const { nonce } = (await nonceRes.json()) as { nonce: string };
+      const message = new SiweMessage({
+        domain: window.location.host,
+        address,
+        statement: 'Sign in as a client to verify a credential.',
+        uri: window.location.origin,
+        version: '1',
+        chainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 31337),
+        nonce,
+        issuedAt: new Date().toISOString(),
+      }).prepareMessage();
+      const signature = await signMessageAsync({ message });
+      const r = await fetch('/api/auth/siwe/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, signature }),
+      });
+      const j = (await r.json()) as { ok: boolean; error?: string };
+      if (!j.ok) throw new Error(j.error ?? 'siwe-failed');
+      setSignedIn(true);
+      setPhase('idle');
+    } catch (e) {
+      setError((e as Error).message);
+      setPhase('idle');
+    }
+  }
+
+  async function present() {
+    setError(null);
+    setPhase('presenting');
     try {
       const r = await fetch('/api/verifier/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind: 'pid' }),
       });
-      const j = (await r.json()) as { state: string; wwwalletUrl: string; error?: string };
+      const j = (await r.json()) as PresentationResponse & { error?: string };
       if (!r.ok) throw new Error(j.error ?? 'request-failed');
-      setPresentation({ state: j.state, wwwalletUrl: j.wwwalletUrl });
-      setStep('verifying');
+      setPresentation(j);
       pollResult(j.state);
     } catch (e) {
       setError((e as Error).message);
-    }
-  }
-
-  async function startIssuance() {
-    if (!session) return;
-    setError(null);
-    try {
-      const r = await fetch(`/api/issuer/pid/offer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subjectAddress: session.address }),
-      });
-      const j = (await r.json()) as { wwwalletUrl?: string; error?: string; detail?: string };
-      if (!r.ok || !j.wwwalletUrl) throw new Error(j.detail ?? j.error ?? 'offer-failed');
-      // Open in a new tab so the user can complete the wwWallet flow then return.
-      setPresentation({
-        state: '',
-        wwwalletUrl: '',
-        issuerOfferUrl: j.wwwalletUrl,
-      });
-    } catch (e) {
-      setError((e as Error).message);
+      setPhase('idle');
     }
   }
 
@@ -88,90 +116,101 @@ export function ClientOnboardingFlow({ returnTo }: { returnTo: string }) {
       const j = (await r.json()) as { status: string; error?: string };
       if (j.status === 'verified') {
         clearInterval(pollRef.current!);
-        setStep('done');
+        setPhase('verified');
         setTimeout(() => {
           router.push(returnTo);
           router.refresh();
-        }, 800);
+        }, 1000);
       } else if (j.status === 'rejected') {
         clearInterval(pollRef.current!);
         setError(j.error ?? 'verification rejected');
-        setStep('present-pid');
+        setPhase('idle');
       }
     }, 2000);
   }
-
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   return (
     <div className="space-y-4">
+      {/* Step 1 */}
       <Card className="p-6">
         <div className="flex items-center gap-2">
-          <StepIcon active={step === 'authenticate'} done={!!session} />
-          <h3 className="text-base font-semibold text-navy-900">1. Authenticate with wallet</h3>
+          <StepIcon n={1} done={isConnected} active={!isConnected} />
+          <h3 className="text-base font-semibold text-navy-900">Connect wallet</h3>
         </div>
-        {session ? (
-          <p className="mt-2 text-sm text-slate-700">
-            Signed in as <code className="font-mono text-xs">{session.address.slice(0, 6)}…{session.address.slice(-4)}</code>.
-          </p>
-        ) : (
-          <p className="mt-2 text-sm text-slate-500">
-            Wallet sign-in (SIWE) hasn't completed. Use the dev-bypass persona picker for the demo session, or wire your wallet here for production.
-          </p>
-        )}
-      </Card>
-
-      <Card className="p-6">
-        <div className="flex items-center gap-2">
-          <StepIcon active={step === 'present-pid' || step === 'verifying'} done={step === 'done'} />
-          <h3 className="text-base font-semibold text-navy-900">2. Mint + present an EU PID credential</h3>
-        </div>
-        <p className="mt-2 text-sm text-slate-700">
-          The wwWallet web wallet holds the credential. We'll first issue the PID into your wallet, then ask the wallet to present
-          only <code>address.country</code> and <code>age_equal_or_over.18</code>.
+        <p className="mt-2 text-sm text-slate-500">
+          Use a wallet account that holds — or will hold — an EU PID credential.
         </p>
-        {error ? <p className="mt-2 text-sm text-red-500">Error: {error}</p> : null}
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button onClick={startIssuance} disabled={!session} variant="secondary" size="sm">
-            <ExternalLink className="h-4 w-4" aria-hidden /> Mint PID at issuer
-          </Button>
-          <Button onClick={startPresentation} disabled={!session} size="sm">
-            <ExternalLink className="h-4 w-4" aria-hidden /> Present PID to verifier
-          </Button>
-        </div>
-        {presentation?.issuerOfferUrl ? (
-          <p className="mt-3 text-xs text-slate-500">
-            Open this URL in a new tab to mint the PID:{' '}
-            <a href={presentation.issuerOfferUrl} target="wwwallet" rel="noreferrer" className="text-teal-700 underline break-all">
-              {presentation.issuerOfferUrl}
-            </a>
-          </p>
-        ) : null}
-        {presentation?.wwwalletUrl ? (
-          <p className="mt-3 text-xs text-slate-500">
-            Hand off to wwWallet:{' '}
-            <a href={presentation.wwwalletUrl} target="wwwallet" rel="noreferrer" className="text-teal-700 underline break-all">
-              {presentation.wwwalletUrl}
-            </a>
-          </p>
-        ) : null}
-        {step === 'verifying' ? (
-          <p className="mt-3 inline-flex items-center gap-1 text-xs text-slate-500">
-            <Hourglass className="h-3.5 w-3.5" aria-hidden /> Polling for verifier result…
-          </p>
-        ) : null}
+        <div className="mt-3"><ConnectWallet /></div>
       </Card>
 
-      {step === 'done' ? (
-        <Card className="border-teal-300 bg-teal-50/40 p-6">
-          <p className="text-sm text-teal-700">Verified. Redirecting…</p>
-        </Card>
+      {/* Step 2 */}
+      <Card className={`p-6 ${!isConnected ? 'opacity-50' : ''}`}>
+        <div className="flex items-center gap-2">
+          <StepIcon n={2} done={signedIn} active={isConnected && !signedIn} />
+          <h3 className="text-base font-semibold text-navy-900">Sign in (SIWE)</h3>
+        </div>
+        <p className="mt-2 text-sm text-slate-500">
+          Bind your wallet to a server session. Your wallet will sign a one-time message.
+        </p>
+        <div className="mt-3">
+          {signedIn ? (
+            <span className="inline-flex items-center gap-1 text-sm text-teal-700">
+              <CheckCircle2 className="h-4 w-4" aria-hidden /> Signed in
+            </span>
+          ) : (
+            <Button onClick={doSiwe} disabled={!isConnected || phase === 'siwe'} size="sm">
+              {phase === 'siwe' ? 'Signing…' : 'Sign in with Ethereum'}
+            </Button>
+          )}
+        </div>
+      </Card>
+
+      {/* Step 3 */}
+      <Card className={`p-6 ${!signedIn ? 'opacity-50' : ''}`}>
+        <div className="flex items-center gap-2">
+          <StepIcon n={3} done={phase === 'verified'} active={signedIn && phase !== 'verified'} />
+          <h3 className="text-base font-semibold text-navy-900">Present PID credential</h3>
+        </div>
+        <p className="mt-2 text-sm text-slate-500">
+          Hand off to wwWallet. Only <code>address.country</code> and{' '}
+          <code>age_equal_or_over.18</code> are requested — your name, birth date, document
+          number, and full address never leave your wallet.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          {phase === 'verified' ? (
+            <span className="inline-flex items-center gap-1 text-sm text-teal-700">
+              <CheckCircle2 className="h-4 w-4" aria-hidden /> Verified — redirecting…
+            </span>
+          ) : presentation ? (
+            <>
+              <Button asChild size="sm">
+                <a href={presentation.wwwalletUrl} target="wwwallet" rel="noreferrer">
+                  <ExternalLink className="h-4 w-4" aria-hidden /> Open in wwWallet
+                </a>
+              </Button>
+              <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+                <Hourglass className="h-3.5 w-3.5" aria-hidden /> Polling for verifier result…
+              </span>
+            </>
+          ) : (
+            <Button onClick={present} disabled={!signedIn} size="sm">
+              Present PID
+            </Button>
+          )}
+        </div>
+      </Card>
+
+      {error ? (
+        <div className="rounded-lg border border-red-500 bg-red-50 p-3 text-sm text-red-500">
+          Error: {error}
+        </div>
       ) : null}
     </div>
   );
 }
 
-function StepIcon({ active, done }: { active: boolean; done: boolean }) {
+function StepIcon({ n, done, active }: { n: number; done: boolean; active: boolean }) {
   if (done) return <CheckCircle2 className="h-5 w-5 text-teal-500" aria-hidden />;
   return (
     <span
@@ -181,7 +220,7 @@ function StepIcon({ active, done }: { active: boolean; done: boolean }) {
       }
       aria-hidden
     >
-      •
+      {n}
     </span>
   );
 }
