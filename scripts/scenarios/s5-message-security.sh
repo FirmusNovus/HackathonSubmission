@@ -28,9 +28,9 @@ expect_eq "$PLAIN" "400" "plaintext field rejected with 400"
 expect_match "$(cat /tmp/.s5-plain)" "plaintext-not-allowed" "error code 'plaintext-not-allowed'"
 
 echo
-echo "  -- POST from non-participant (Marco, persona 4) MUST be rejected"
-marco_cookie=$(mktemp); login_as 4 "$marco_cookie"
-NP=$(curl -s -X POST -H "Content-Type: application/json" -b "$marco_cookie" \
+echo "  -- POST from non-participant (Sofia, persona 4) MUST be rejected"
+sofia_cookie=$(mktemp); login_as 4 "$sofia_cookie"
+NP=$(curl -s -X POST -H "Content-Type: application/json" -b "$sofia_cookie" \
   --data "{\"engagementId\":$EID,\"ciphertextB64\":\"$(echo -n hello | base64)\",\"ivB64\":\"$(echo -n 0123456789ab | base64)\",\"saltB64\":\"$(echo -n 0123456789abcdef | base64)\",\"signature\":\"sig\"}" \
   -o /tmp/.s5-np "$PLATFORM/api/messages" -w "%{http_code}")
 echo "    HTTP $NP: $(cat /tmp/.s5-np)"
@@ -38,7 +38,7 @@ expect_eq "$NP" "403" "non-participant POST rejected with 403"
 
 echo
 echo "  -- GET from non-participant MUST be rejected"
-NP_GET=$(curl -s -b "$marco_cookie" -o /tmp/.s5-npg "$PLATFORM/api/messages?engagementId=$EID" -w "%{http_code}")
+NP_GET=$(curl -s -b "$sofia_cookie" -o /tmp/.s5-npg "$PLATFORM/api/messages?engagementId=$EID" -w "%{http_code}")
 echo "    HTTP $NP_GET: $(cat /tmp/.s5-npg)"
 expect_eq "$NP_GET" "403" "non-participant GET rejected with 403"
 

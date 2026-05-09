@@ -47,9 +47,9 @@ expect_eq "$HTTP" "401" "lawyer cannot complete (client-only)"
 
 echo
 echo "  -- a different lawyer cannot accept someone else's consultation --"
-klaus_cookie=$(mktemp); login_as 2 "$klaus_cookie"
-HTTP=$(curl -s -o /tmp/.s7-other -b "$klaus_cookie" -X POST "$PLATFORM/api/consultations/$CID/accept" -w "%{http_code}")
-echo "    Klaus POST $CID/accept -> HTTP $HTTP: $(cat /tmp/.s7-other)"
+carlos_cookie=$(mktemp); login_as 2 "$carlos_cookie"
+HTTP=$(curl -s -o /tmp/.s7-other -b "$carlos_cookie" -X POST "$PLATFORM/api/consultations/$CID/accept" -w "%{http_code}")
+echo "    Carlos POST $CID/accept -> HTTP $HTTP: $(cat /tmp/.s7-other)"
 # 404 — never leak path existence on cross-lawyer access.
 expect_eq "$HTTP" "404" "wrong lawyer => 404 not 403"
 

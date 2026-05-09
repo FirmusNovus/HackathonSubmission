@@ -57,6 +57,7 @@ apps/*/.next-test/
 
 # Per-app TypeScript build info
 apps/*/*.tsbuildinfo
+packages/*/*.tsbuildinfo
 
 
 # =====================================================================
