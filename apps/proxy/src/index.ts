@@ -1,12 +1,14 @@
 // Owner spec: 001-verified-legal-engagement.
-// Path-routed reverse proxy: /api/issuer/* and /issuer/* go to the issuer
-// (port 3001); everything else goes to the platform (port 3010). The wallet
-// sees a single ngrok-fronted origin (FR-061a / single-hostname constraint).
+// Path-routed reverse proxy: routes the wallet's /api/issuer/* and the
+// browser's /issuer/* to the issuer process (port 3001); everything else
+// goes to the platform (port 3010). The wallet sees a single
+// ngrok-fronted origin (single-hostname constraint).
 //
-// User-facing issuer pages live at the issuer's `/` root; the proxy strips
-// the `/issuer` prefix on those non-API routes before forwarding so the
-// issuer's Next.js doesn't need a basePath (its OID4VCI well-known URLs are
-// hard-coded as /api/issuer/{pid,bar}/...).
+// The issuer's Next.js is mounted under basePath="/issuer" so its asset
+// URLs (/_next/...) end up at /issuer/_next/... — those route back to the
+// issuer naturally. To keep wwWallet-facing API URLs short
+// (/api/issuer/{pid,bar}/...), we rewrite those into /issuer/api/issuer/...
+// before forwarding so the issuer's basePath-aware router accepts them.
 
 import http from 'node:http';
 import { URL } from 'node:url';
@@ -21,20 +23,14 @@ interface RouteDecision {
 }
 
 function route(reqUrl: string): RouteDecision {
-  // /api/issuer/* — forward as-is to issuer.
+  // Wallet-facing OID4VCI URLs — keep short, add /issuer for the basePath.
   if (reqUrl.startsWith('/api/issuer/') || reqUrl === '/api/issuer') {
+    return { target: ISSUER_TARGET, rewrittenPath: '/issuer' + reqUrl };
+  }
+  // Browser-facing issuer pages + assets — already include /issuer.
+  if (reqUrl === '/issuer' || reqUrl === '/issuer/' || reqUrl.startsWith('/issuer/')) {
     return { target: ISSUER_TARGET, rewrittenPath: reqUrl };
   }
-  // /issuer/* — forward to issuer with /issuer stripped, so /issuer hits the
-  // issuer's `/` (its landing page) and /issuer/_next/... hits the issuer's
-  // /_next/... assets.
-  if (reqUrl === '/issuer' || reqUrl === '/issuer/') {
-    return { target: ISSUER_TARGET, rewrittenPath: '/' };
-  }
-  if (reqUrl.startsWith('/issuer/')) {
-    return { target: ISSUER_TARGET, rewrittenPath: reqUrl.slice('/issuer'.length) };
-  }
-  // Everything else → platform.
   return { target: PLATFORM_TARGET, rewrittenPath: reqUrl };
 }
 
