@@ -125,6 +125,23 @@ export function LawyerOnboardingFlow({ returnTo }: { returnTo: string }) {
       const j = (await r.json()) as { status: string; error?: string };
       if (j.status === 'verified') {
         clearInterval(pollRef.current!);
+        // Wallet got its 200; now write the EAS attestation.
+        try {
+          const path = kind === 'pid'
+            ? '/api/onboarding/client/finalize'
+            : '/api/onboarding/lawyer/finalize';
+          const f = await fetch(path, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state }),
+          });
+          const fj = (await f.json()) as { ok?: boolean; error?: string };
+          if (!f.ok || !fj.ok) throw new Error(fj.error ?? 'finalize-failed');
+        } catch (e) {
+          setError((e as Error).message);
+          setPhase('idle');
+          return;
+        }
         setPresentation(null);
         setPhase('idle');
         if (kind === 'pid') setPidVerified(true);
