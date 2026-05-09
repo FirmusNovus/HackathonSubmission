@@ -2,59 +2,148 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   Firmus Novus — design tokens (ported to Tailwind v3 / shadcn)
+   The :root CSS variables drive both:
+     • Firmus utilities (bg-navy-900, text-teal-600, …) — declared
+       in tailwind.config.ts as plain hex colors.
+     • shadcn CSS variables (--background, --primary, …) — mapped
+       to Firmus values so existing UI primitives inherit the look.
+   ============================================================ */
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.5rem;
-  }
+    /* Firmus palette as raw values (consumed by direct CSS, not Tailwind) */
+    --firmus-navy-950: #0a1428;
+    --firmus-navy-900: #0a1f44;
+    --firmus-navy-800: #102a4c;
+    --firmus-navy-700: #1a3666;
+    --firmus-slate-900: #1a2533;
+    --firmus-slate-700: #2c3e50;
+    --firmus-slate-500: #5b6b7c;
+    --firmus-slate-300: #a8b3bf;
+    --firmus-slate-200: #cfd6dd;
+    --firmus-slate-100: #e5e9ee;
+    --firmus-slate-50: #eef1f4;
+    --firmus-white-50: #f4f6f8;
+    --firmus-white-0: #ffffff;
+    --firmus-teal-50: #e6faf7;
+    --firmus-teal-100: #ccf5ef;
+    --firmus-teal-300: #5ee0cd;
+    --firmus-teal-400: #00d4c4;
+    --firmus-teal-500: #14b8a6;
+    --firmus-teal-600: #0e9488;
+    --firmus-teal-700: #0b7a70;
+    --firmus-gold-100: #f5efd9;
+    --firmus-gold-300: #e0cd93;
+    --firmus-gold-500: #c9a961;
+    --firmus-gold-700: #9c7e3f;
 
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-    --radius: 0.5rem;
+    /* shadcn HSL CSS variables, mapped onto Firmus tones. */
+    --background: 210 27% 96%; /* white-50 */
+    --foreground: 211 29% 25%; /* slate-700 */
+    --card: 0 0% 100%;
+    --card-foreground: 218 73% 15%; /* navy-900 */
+    --popover: 0 0% 100%;
+    --popover-foreground: 218 73% 15%;
+    --primary: 218 73% 15%; /* navy-900 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 213 22% 95%; /* slate-100 */
+    --secondary-foreground: 218 73% 15%;
+    --muted: 213 22% 95%;
+    --muted-foreground: 211 16% 42%; /* slate-500 */
+    --accent: 173 80% 96%; /* teal-50 */
+    --accent-foreground: 175 81% 31%; /* teal-700 */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 213 22% 91%;
+    --input: 213 22% 91%;
+    --ring: 173 80% 40%; /* teal-500 */
+    --radius: 0.625rem;
+
+    --shadow-sm: 0 1px 2px rgba(10, 31, 68, 0.04), 0 1px 3px rgba(10, 31, 68, 0.06);
+    --shadow-md: 0 4px 8px rgba(10, 31, 68, 0.06), 0 8px 24px rgba(10, 31, 68, 0.08);
+    --shadow-lg: 0 12px 24px rgba(10, 31, 68, 0.08), 0 24px 48px rgba(10, 31, 68, 0.12);
   }
 }
 
 @layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
   * {
     @apply border-border;
   }
+
+  html,
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-inter), Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--firmus-navy-900);
+    font-weight: 600;
+  }
+
+  ::selection {
+    background: var(--firmus-teal-100);
+    color: var(--firmus-navy-900);
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-fraunces), Fraunces, "Tiempos Headline", Georgia, serif;
+    font-weight: 400;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+  }
+}
+
+/* Subtle hero pattern (rendered as inline SVG by NetworkPattern) — keeps drift slow */
+@keyframes firmus-drift {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-40px, -40px, 0);
+  }
+}
+.firmus-pattern-drift {
+  animation: firmus-drift 8s linear infinite alternate;
+}
+
+/* Skeleton shimmer for loading states */
+@keyframes firmus-shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+.firmus-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--firmus-slate-100) 0%,
+    var(--firmus-slate-50) 40%,
+    var(--firmus-slate-100) 80%
+  );
+  background-size: 200px 100%;
+  background-repeat: no-repeat;
+  animation: firmus-shimmer 1.4s infinite linear;
+  border-radius: 6px;
 }

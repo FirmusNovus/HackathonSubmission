@@ -13,6 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
+import { FirmusBadge } from "@/components/firmus/firmus-badge";
 
 interface InboxRequest {
   request_id: number;
@@ -150,15 +152,12 @@ export default function InboxPage() {
   }
 
   return (
-    <div className="space-y-8 py-8">
-      <div>
-        <h1 className="text-3xl font-bold">Inbox</h1>
-        <p className="mt-2 max-w-prose text-muted-foreground">
-          Engagement requests addressed to your wallet. Each row shows what the client has
-          disclosed (country of residence + age-over-18 only — no name, no document number) plus
-          the matter description.
-        </p>
-      </div>
+    <PageShell width="wide" className="space-y-8">
+      <PageHeader
+        eyebrow="Lawyer"
+        title="Inbox."
+        description="Engagement requests addressed to your wallet. Each row shows what the client has disclosed (country of residence + age-over-18 only — no name, no document number) plus the matter description."
+      />
 
       {authStatus === "no-session" && (
         <Alert>
@@ -181,7 +180,7 @@ export default function InboxPage() {
       )}
 
       {authStatus === "ok" && requests.length === 0 && (
-        <p className="text-sm text-muted-foreground">No engagement requests yet.</p>
+        <p className="text-[14px] text-slate-500">No engagement requests yet.</p>
       )}
 
       <div className="space-y-4">
@@ -189,62 +188,64 @@ export default function InboxPage() {
           const isHeadFromMe =
             r.head_proposal?.proposer_address?.toLowerCase() === address?.toLowerCase();
           return (
-            <Card key={r.request_id}>
+            <Card key={r.request_id} className="border-slate-100 bg-white shadow-none">
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <CardTitle className="text-base">
+                    <CardTitle className="font-display text-[18px] text-navy-900">
                       {r.matter.target_practice_area} · {r.matter.target_jurisdiction}
                     </CardTitle>
-                    <CardDescription className="text-xs">
+                    <CardDescription className="font-mono text-[12px] text-slate-300">
                       Request #{r.request_id} · matter #{r.matter.id} ·{" "}
                       {new Date(r.created_at * 1000).toLocaleString()}
                     </CardDescription>
                   </div>
-                  <Badge
-                    variant={
+                  <FirmusBadge
+                    kind={
                       r.status === "pending"
-                        ? "default"
+                        ? "info"
                         : r.status === "accepted"
-                          ? "secondary"
-                          : "outline"
+                          ? "success"
+                          : "neutral"
                     }
                   >
                     {r.status}
-                  </Badge>
+                  </FirmusBadge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="whitespace-pre-wrap text-sm">{r.matter.description}</p>
+                <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-slate-700">
+                  {r.matter.description}
+                </p>
 
-                <div className="rounded-md border bg-muted/40 p-3 text-xs">
-                  <div className="font-medium">Client</div>
-                  <div className="font-mono text-muted-foreground">{r.client.address}</div>
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-[12px]">
+                  <div className="font-medium text-navy-900">Client</div>
+                  <div className="font-mono text-slate-500">{r.client.address}</div>
                   <div className="mt-1 flex flex-wrap gap-2">
                     {r.client.country_of_residence && (
-                      <Badge variant="outline">
-                        residence: {r.client.country_of_residence}
-                      </Badge>
+                      <FirmusBadge kind="info">
+                        residence · {r.client.country_of_residence}
+                      </FirmusBadge>
                     )}
                     {r.client.age_equal_or_over_18 !== null && (
-                      <Badge variant="outline">
-                        18+: {r.client.age_equal_or_over_18 ? "yes" : "no"}
-                      </Badge>
+                      <FirmusBadge kind={r.client.age_equal_or_over_18 ? "success" : "error"}>
+                        18+ · {r.client.age_equal_or_over_18 ? "yes" : "no"}
+                      </FirmusBadge>
                     )}
                   </div>
                 </div>
 
                 {r.head_proposal && (
-                  <div className="rounded-md border p-3 text-xs">
-                    <div className="font-medium">
+                  <div className="rounded-lg border border-slate-100 p-3 text-[12px]">
+                    <div className="font-medium text-navy-900">
                       Current proposal {isHeadFromMe ? "(yours)" : "(client's counter)"}
                     </div>
-                    <div className="font-mono text-muted-foreground">
+                    <div className="font-mono text-teal-600">
                       {r.head_proposal.amount_wei
                         ? `${(Number(BigInt(r.head_proposal.amount_wei)) / 1e18).toFixed(4)} ETH`
                         : "—"}
                     </div>
-                    <div className="text-muted-foreground">
+                    <div className="text-slate-500">
                       {r.proposal_count} message{r.proposal_count === 1 ? "" : "s"} on the chain
                     </div>
                   </div>
@@ -254,12 +255,12 @@ export default function InboxPage() {
                   <div className="flex flex-wrap gap-2 pt-1">
                     {!r.head_proposal && (
                       <Button
-                        variant="default"
                         size="sm"
                         onClick={() =>
                           setOpenRow(openRow === r.request_id ? null : r.request_id)
                         }
                         disabled={submitting === r.request_id}
+                        className="rounded-lg bg-teal-500 text-white hover:bg-teal-600"
                       >
                         {openRow === r.request_id ? "Cancel" : "Propose first milestone"}
                       </Button>
@@ -268,7 +269,11 @@ export default function InboxPage() {
                         unified place for both parties to keep negotiating —
                         seeing the client's counter and posting one back. */}
                     {r.head_proposal && (
-                      <Button asChild variant="default" size="sm">
+                      <Button
+                        asChild
+                        size="sm"
+                        className="rounded-lg bg-teal-500 text-white hover:bg-teal-600"
+                      >
                         <a href={`/engagements/${r.request_id}`}>Open thread</a>
                       </Button>
                     )}
@@ -277,6 +282,7 @@ export default function InboxPage() {
                       size="sm"
                       onClick={() => decline(r.request_id)}
                       disabled={submitting === r.request_id}
+                      className="rounded-lg border-slate-200 text-slate-700 hover:bg-slate-50"
                     >
                       {submitting === r.request_id ? "…" : "Decline"}
                     </Button>
@@ -294,7 +300,7 @@ export default function InboxPage() {
           );
         })}
       </div>
-    </div>
+    </PageShell>
   );
 }
 

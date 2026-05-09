@@ -14,6 +14,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
+import { FirmusBadge } from "@/components/firmus/firmus-badge";
 
 // Mirrors the server-side zod schema in app/api/matters/route.ts. Kept in sync
 // manually because the api route is server-only (better-sqlite3 import) and
@@ -140,15 +142,12 @@ export default function MattersPage() {
   }
 
   return (
-    <div className="space-y-8 py-8">
-      <div>
-        <h1 className="text-3xl font-bold">Your matters</h1>
-        <p className="mt-2 max-w-prose text-muted-foreground">
-          A matter is a free-form description of a legal question, scoped to a target jurisdiction
-          and practice area. It does not include a price — pricing is the lawyer's response to an
-          engagement request, never part of the matter itself.
-        </p>
-      </div>
+    <PageShell width="wide" className="space-y-8">
+      <PageHeader
+        eyebrow="Client"
+        title="Your matters."
+        description="A matter is a free-form description of a legal question, scoped to a target jurisdiction and practice area. It does not include a price — pricing is the lawyer's response to an engagement request, never part of the matter itself."
+      />
 
       {authStatus === "no-session" && (
         <Alert>
@@ -176,10 +175,10 @@ export default function MattersPage() {
         </Alert>
       )}
 
-      <Card>
+      <Card className="border-slate-100 bg-white shadow-none">
         <CardHeader>
-          <CardTitle>Post a new matter</CardTitle>
-          <CardDescription>
+          <CardTitle className="font-display text-2xl text-navy-900">Post a new matter</CardTitle>
+          <CardDescription className="text-[14px] leading-relaxed text-slate-500">
             Describe what you need help with. The lawyer who picks it up only sees the description,
             jurisdiction, practice area, and the disclosed-attribute subset of your PID — not your
             name, document number, or any other PID claim.
@@ -239,7 +238,11 @@ export default function MattersPage() {
               </div>
             </div>
 
-            <Button type="submit" disabled={form.formState.isSubmitting || authStatus !== "ok"}>
+            <Button
+              type="submit"
+              disabled={form.formState.isSubmitting || authStatus !== "ok"}
+              className="rounded-lg bg-teal-500 px-5 text-white hover:bg-teal-600"
+            >
               {form.formState.isSubmitting ? "Posting…" : "Post matter"}
             </Button>
           </form>
@@ -247,7 +250,7 @@ export default function MattersPage() {
       </Card>
 
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Posted</h2>
+        <h2 className="font-display text-2xl text-navy-900">Posted</h2>
         {loadError && (
           <Alert variant="destructive">
             <AlertTitle>Couldn't load your matters</AlertTitle>
@@ -255,33 +258,33 @@ export default function MattersPage() {
           </Alert>
         )}
         {authStatus === "ok" && matters.length === 0 && !loadError && (
-          <p className="text-sm text-muted-foreground">No matters yet.</p>
+          <p className="text-[14px] text-slate-500">No matters yet.</p>
         )}
         {matters.map((m) => (
-          <Card key={m.id}>
+          <Card key={m.id} className="border-slate-100 bg-white shadow-none">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between gap-3">
-                <CardTitle className="text-base">
+                <CardTitle className="font-display text-[18px] text-navy-900">
                   {m.target_practice_area} · {m.target_jurisdiction}
                 </CardTitle>
-                <Badge
-                  variant={
-                    m.status === "open" ? "default" : m.status === "engaged" ? "secondary" : "outline"
-                  }
+                <FirmusBadge
+                  kind={m.status === "open" ? "info" : m.status === "engaged" ? "success" : "neutral"}
                 >
                   {m.status}
-                </Badge>
+                </FirmusBadge>
               </div>
-              <CardDescription className="text-xs">
+              <CardDescription className="font-mono text-[12px] text-slate-300">
                 #{m.id} · posted {new Date(m.created_at * 1000).toLocaleString()}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="whitespace-pre-wrap text-sm">{m.description}</p>
+              <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-slate-700">
+                {m.description}
+              </p>
             </CardContent>
           </Card>
         ))}
       </div>
-    </div>
+    </PageShell>
   );
 }

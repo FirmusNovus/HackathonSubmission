@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
+import { EBSIBadge } from "@/components/firmus/ebsi-badge";
 
 type Step =
   | "needs-wallet"
@@ -209,19 +211,30 @@ export default function ClientOnboardingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 py-8">
-      <div>
-        <h1 className="text-3xl font-bold">Client onboarding</h1>
-        <p className="mt-2 text-muted-foreground">
-          Present an EU resident credential (PID) from your wallet to receive an on-chain{" "}
-          <code className="text-xs">verified_client</code> attestation. Once attested, you can post
-          matters and engage with verified lawyers.
-        </p>
+    <PageShell width="narrow" className="max-w-2xl space-y-6">
+      <PageHeader
+        eyebrow="Onboarding"
+        title="Client onboarding."
+        description={
+          <>
+            Present an EU resident credential (PID) from your wallet to receive an on-chain{" "}
+            <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[12px] text-navy-900">
+              verified_client
+            </code>{" "}
+            attestation. Once attested, you can post matters and engage with verified lawyers.
+          </>
+        }
+      />
+      <div className="mb-4 inline-flex items-center gap-3 rounded-full border border-slate-100 bg-white px-4 py-2 shadow-[var(--shadow-sm)]">
+        <EBSIBadge variant="seal" size={18} />
+        <span className="text-[12px] font-medium text-slate-700">
+          Only country-of-residence and age-over-18 leave your wallet.
+        </span>
       </div>
 
-      <Card>
+      <Card className="border-slate-100 bg-white shadow-none">
         <CardHeader>
-          <CardTitle>Step 1 — Connect wallet</CardTitle>
+          <CardTitle className="font-display text-xl text-navy-900">Step 1 — Connect wallet</CardTitle>
           <CardDescription>
             Use the wallet whose address corresponds to one of the client personas (anvil account 6+).
           </CardDescription>
@@ -238,9 +251,9 @@ export default function ClientOnboardingPage() {
       </Card>
 
       {isConnected && (
-        <Card>
+        <Card className="border-slate-100 bg-white shadow-none">
           <CardHeader>
-            <CardTitle>Step 2 — Sign in (SIWE)</CardTitle>
+            <CardTitle className="font-display text-xl text-navy-900">Step 2 — Sign in (SIWE)</CardTitle>
             <CardDescription>
               Bind your wallet to a server session so the issuer knows who's asking for a credential.
             </CardDescription>
@@ -256,9 +269,9 @@ export default function ClientOnboardingPage() {
       )}
 
       {signedIn && (
-        <Card>
+        <Card className="border-slate-100 bg-white shadow-none">
           <CardHeader>
-            <CardTitle>Step 3 — Get PID</CardTitle>
+            <CardTitle className="font-display text-xl text-navy-900">Step 3 — Get PID</CardTitle>
             <CardDescription>
               Mints a PID credential offer. Open the wwWallet link in a new tab to receive the
               SD-JWT VC.
@@ -288,9 +301,9 @@ export default function ClientOnboardingPage() {
       )}
 
       {offer && (
-        <Card>
+        <Card className="border-slate-100 bg-white shadow-none">
           <CardHeader>
-            <CardTitle>Step 4 — Present PID</CardTitle>
+            <CardTitle className="font-display text-xl text-navy-900">Step 4 — Present PID</CardTitle>
             <CardDescription>
               Present your PID back to the platform's verifier. Only{" "}
               <code className="text-xs">age_equal_or_over.18</code> and{" "}
@@ -351,6 +364,6 @@ export default function ClientOnboardingPage() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-    </div>
+    </PageShell>
   );
 }

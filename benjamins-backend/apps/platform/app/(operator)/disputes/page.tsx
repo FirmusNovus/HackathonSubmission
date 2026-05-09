@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
+import { FirmusBadge } from "@/components/firmus/firmus-badge";
 import {
   decryptDisputeBundle,
   type DisputeBundle,
@@ -226,16 +228,22 @@ export default function OperatorDisputesPage() {
   }
 
   return (
-    <div className="space-y-6 py-8">
-      <div>
-        <h1 className="text-3xl font-bold">Operator · Disputes</h1>
-        <p className="mt-2 max-w-prose text-muted-foreground">
-          Every milestone currently in <code>disputed</code> state. For each one, enter
-          how the parked amount should split between the lawyer and client; the contract
-          pays both addresses in a single tx. The split must equal the milestone amount
-          to the wei.
-        </p>
-      </div>
+    <PageShell width="wide" className="space-y-6">
+      <PageHeader
+        eyebrow="Operator console"
+        title="Disputes."
+        description={
+          <>
+            Every milestone currently in{" "}
+            <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[12px] text-navy-900">
+              disputed
+            </code>{" "}
+            state. For each one, enter how the parked amount should split between the lawyer and
+            client; the contract pays both addresses in a single tx. The split must equal the
+            milestone amount to the wei.
+          </>
+        }
+      />
 
       {authStatus === "no-session" && (
         <Alert>
@@ -305,7 +313,7 @@ export default function OperatorDisputesPage() {
       )}
 
       {authStatus === "ok" && disputes.length === 0 && (
-        <p className="text-sm text-muted-foreground">No active disputes.</p>
+        <p className="text-[14px] text-slate-500">No active disputes.</p>
       )}
 
       <div className="space-y-4">
@@ -322,7 +330,7 @@ export default function OperatorDisputesPage() {
           );
         })}
       </div>
-    </div>
+    </PageShell>
   );
 }
 
@@ -398,23 +406,23 @@ function DisputeCard({
   }
 
   return (
-    <Card>
+    <Card className="border-slate-100 bg-white shadow-none">
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle className="text-base">
+            <CardTitle className="font-display text-[18px] text-navy-900">
               Engagement #{d.engagement_id} · Milestone #{d.milestone_index}
             </CardTitle>
-            <CardDescription className="text-xs">
+            <CardDescription className="text-[12px] text-slate-500">
               {d.engagement.matter.target_practice_area} ·{" "}
               {d.engagement.matter.target_jurisdiction} ·{" "}
-              <span className="font-mono">{formatEther(total)} ETH</span> parked · disputed{" "}
-              {new Date(d.updated_at * 1000).toLocaleString()}
+              <span className="font-mono text-navy-900">{formatEther(total)} ETH</span> parked ·
+              disputed {new Date(d.updated_at * 1000).toLocaleString()}
             </CardDescription>
           </div>
-          <Badge variant={d.trigger === "lawyer_escalation" ? "secondary" : "destructive"}>
+          <FirmusBadge kind={d.trigger === "lawyer_escalation" ? "pending" : "error"}>
             {d.trigger === "lawyer_escalation" ? "lawyer escalation" : "client dispute"}
-          </Badge>
+          </FirmusBadge>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">

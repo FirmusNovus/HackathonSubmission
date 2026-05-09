@@ -1,6 +1,11 @@
+import Link from "next/link";
 import { getDb } from "@/lib/db";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
+import { AvatarBubble } from "@/components/firmus/avatar-bubble";
+import { FirmusBadge } from "@/components/firmus/firmus-badge";
+import { EmptyState } from "@/components/firmus/empty-state";
+import { EBSIBadge } from "@/components/firmus/ebsi-badge";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,48 +27,68 @@ export default function LawyersPage() {
     .all() as LawyerRow[];
 
   return (
-    <div className="space-y-6 py-8">
-      <div>
-        <h1 className="text-3xl font-bold">Lawyers</h1>
-        <p className="mt-2 text-muted-foreground">
-          {rows.length === 0
+    <PageShell width="full">
+      <PageHeader
+        eyebrow="Directory"
+        title="Verified counsel."
+        description={
+          rows.length === 0
             ? "No lawyers have onboarded yet. Visit /onboarding/lawyer to onboard yours."
-            : "Verified pseudonymous EU lawyers, in order of attestation. Click a card to view their profile."}
-        </p>
-      </div>
+            : "Verified pseudonymous EU lawyers, in order of attestation. Click a card to view their profile."
+        }
+      />
 
-      {rows.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {rows.length === 0 ? (
+        <EmptyState
+          title="The directory is quiet."
+          body="Lex Nova waits for the first verified lawyer. Onboarding is one bar credential away."
+          ctaLabel="Onboard a lawyer"
+          ctaHref="/onboarding/lawyer"
+        />
+      ) : (
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {rows.map((row) => {
             const disclosed = JSON.parse(row.disclosed_attrs) as Record<string, string>;
-            const display = disclosed.given_name && disclosed.family_name
-              ? `${disclosed.given_name} ${disclosed.family_name}`
-              : `${row.eth_address.slice(0, 8)}…`;
+            const display =
+              disclosed.given_name && disclosed.family_name
+                ? `${disclosed.given_name} ${disclosed.family_name}`
+                : `${row.eth_address.slice(0, 8)}…`;
             return (
-              <a key={row.eth_address} href={`/lawyers/${row.eth_address}`}>
-                <Card className="transition-shadow hover:shadow-md">
-                  <CardHeader>
-                    <CardTitle>{display}</CardTitle>
-                    <CardDescription className="font-mono text-xs">
-                      {row.eth_address.slice(0, 10)}…{row.eth_address.slice(-6)}
-                    </CardDescription>
+              <Link key={row.eth_address} href={`/lawyers/${row.eth_address}`} className="group block">
+                <Card className="h-full border-slate-100 bg-white shadow-none transition-all hover:border-slate-200 hover:shadow-firmus">
+                  <CardHeader className="flex flex-row items-start gap-4 space-y-0">
+                    <AvatarBubble name={display} size={56} verified />
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="font-display text-[18px] text-navy-900">
+                        {display}
+                      </CardTitle>
+                      <p className="mt-0.5 truncate font-mono text-[12px] text-slate-300">
+                        {row.eth_address.slice(0, 10)}…{row.eth_address.slice(-6)}
+                      </p>
+                    </div>
                   </CardHeader>
-                  <CardContent className="space-y-2">
-                    {disclosed.jurisdiction && (
-                      <Badge variant="outline">{disclosed.jurisdiction}</Badge>
-                    )}
+                  <CardContent className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {disclosed.jurisdiction && (
+                        <FirmusBadge kind="info">{disclosed.jurisdiction}</FirmusBadge>
+                      )}
+                      <EBSIBadge variant="small" />
+                    </div>
                     {disclosed.bar_admission_number && (
-                      <p className="font-mono text-xs text-muted-foreground">
-                        {disclosed.bar_admission_number}
+                      <p className="font-mono text-[12px] text-slate-500">
+                        Bar no. {disclosed.bar_admission_number}
                       </p>
                     )}
+                    <span className="text-[13px] font-medium text-teal-600 group-hover:underline">
+                      View profile →
+                    </span>
                   </CardContent>
                 </Card>
-              </a>
+              </Link>
             );
           })}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

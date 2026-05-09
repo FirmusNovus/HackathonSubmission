@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { EngagementChat } from "@/components/EngagementChat";
 import { EngagementMilestones } from "@/components/EngagementMilestones";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 // Inlined copy of @lex-nova/crypto's proposalMessage. Avoids pulling the
 // crypto package's WebCrypto imports into a server-rendered tree edge-case.
@@ -296,14 +297,12 @@ export default function ClientEngagementPage() {
   }
 
   return (
-    <div className="space-y-6 py-8">
-      <div>
-        <h1 className="text-3xl font-bold">Engagement request #{requestId}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The lawyer's signed first-milestone proposal is below. Accept to fund and open the
-          engagement on chain — that single transaction also commits the negotiation transcript.
-        </p>
-      </div>
+    <PageShell width="wide" className="space-y-6">
+      <PageHeader
+        eyebrow={`Engagement request #${requestId}`}
+        title="Negotiate, fund, anchor."
+        description="The lawyer's signed first-milestone proposal is below. Accept to fund and open the engagement on chain — that single transaction also commits the negotiation transcript."
+      />
 
       {authStatus === "no-session" && (
         <Alert>
@@ -328,14 +327,14 @@ export default function ClientEngagementPage() {
 
       {detail && (
         <>
-          <Card>
+          <Card className="border-slate-100 bg-white shadow-none">
             <CardHeader className="pb-2">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <CardTitle className="text-base">
+                  <CardTitle className="font-display text-[18px] text-navy-900">
                     {detail.matter.target_practice_area} · {detail.matter.target_jurisdiction}
                   </CardTitle>
-                  <CardDescription className="text-xs">
+                  <CardDescription className="font-mono text-[12px] text-slate-300">
                     matter #{detail.matter.id} · {new Date(detail.request.created_at * 1000).toLocaleString()}
                   </CardDescription>
                 </div>
@@ -550,7 +549,7 @@ export default function ClientEngagementPage() {
           )}
         </>
       )}
-    </div>
+    </PageShell>
   );
 }
 

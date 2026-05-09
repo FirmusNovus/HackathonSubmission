@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
+import { EBSIBadge } from "@/components/firmus/ebsi-badge";
 
 type Step =
   | "needs-wallet"
@@ -221,19 +223,31 @@ export default function LawyerOnboardingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 py-8">
-      <div>
-        <h1 className="text-3xl font-bold">Lawyer onboarding</h1>
-        <p className="mt-2 text-muted-foreground">
-          Present a bar credential from your wallet to receive an on-chain{" "}
-          <code className="text-xs">verified_lawyer</code> attestation. Once attested, your profile
-          appears in the lawyer directory and clients can engage with you.
-        </p>
+    <PageShell width="narrow" className="max-w-2xl space-y-6">
+      <PageHeader
+        eyebrow="Onboarding"
+        title="Lawyer onboarding."
+        description={
+          <>
+            Present a bar credential from your wallet to receive an on-chain{" "}
+            <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[12px] text-navy-900">
+              verified_lawyer
+            </code>{" "}
+            attestation. Once attested, your profile appears in the directory and clients can engage
+            with you.
+          </>
+        }
+      />
+      <div className="mb-4 inline-flex items-center gap-3 rounded-full border border-slate-100 bg-white px-4 py-2 shadow-[var(--shadow-sm)]">
+        <EBSIBadge variant="seal" size={18} />
+        <span className="text-[12px] font-medium text-slate-700">
+          Attestation issued via EAS · zero plaintext credential storage
+        </span>
       </div>
 
-      <Card>
+      <Card className="border-slate-100 bg-white shadow-none">
         <CardHeader>
-          <CardTitle>Step 1 — Connect wallet</CardTitle>
+          <CardTitle className="font-display text-xl text-navy-900">Step 1 — Connect wallet</CardTitle>
           <CardDescription>
             Use the wallet whose address corresponds to one of the lawyer personas (anvil accounts 1–5).
           </CardDescription>
@@ -250,9 +264,9 @@ export default function LawyerOnboardingPage() {
       </Card>
 
       {isConnected && (
-        <Card>
+        <Card className="border-slate-100 bg-white shadow-none">
           <CardHeader>
-            <CardTitle>Step 2 — Sign in (SIWE)</CardTitle>
+            <CardTitle className="font-display text-xl text-navy-900">Step 2 — Sign in (SIWE)</CardTitle>
             <CardDescription>
               Bind your wallet to a server session so the issuer knows who's asking for a credential.
             </CardDescription>
@@ -268,9 +282,9 @@ export default function LawyerOnboardingPage() {
       )}
 
       {signedIn && (
-        <Card>
+        <Card className="border-slate-100 bg-white shadow-none">
           <CardHeader>
-            <CardTitle>Step 3 — Get bar credential</CardTitle>
+            <CardTitle className="font-display text-xl text-navy-900">Step 3 — Get bar credential</CardTitle>
             <CardDescription>
               Mints a credential offer. Open the wwWallet link in a new tab and approve the offer
               there to receive the SD-JWT VC.
@@ -300,9 +314,9 @@ export default function LawyerOnboardingPage() {
       )}
 
       {offer && (
-        <Card>
+        <Card className="border-slate-100 bg-white shadow-none">
           <CardHeader>
-            <CardTitle>Step 4 — Present credential</CardTitle>
+            <CardTitle className="font-display text-xl text-navy-900">Step 4 — Present credential</CardTitle>
             <CardDescription>
               After your wallet has the credential, present it back to the platform's verifier. We
               issue an EAS attestation on chain when verification succeeds.
@@ -361,6 +375,6 @@ export default function LawyerOnboardingPage() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-    </div>
+    </PageShell>
   );
 }
