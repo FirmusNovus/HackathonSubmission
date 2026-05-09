@@ -14,7 +14,9 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "deploy": "dotenv -e .env -- bash scripts/deploy.sh",
     "seed": "dotenv -e .env -- bash scripts/seed.sh",
-    "reset": "rm -rf apps/platform/data apps/issuer/data apps/platform/lib/chain/addresses.ts && pnpm deploy && pnpm seed",
+    "reset": "bash scripts/reset.sh",
+    "reset:soft": "bash scripts/reset.sh --soft",
+    "reset:keep-keys": "bash scripts/reset.sh --keep-keys",
     "start-all": "bash scripts/start-all.sh",
     "ngrok": "ngrok http --domain=$(echo $PUBLIC_HOSTNAME | sed 's|https://||') 3000"
   },

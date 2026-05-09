@@ -27,5 +27,11 @@ if [[ ! -f apps/platform/lib/chain/addresses.ts ]]; then
   bash scripts/deploy.sh
 fi
 
+# Seed the issuer's subjects roster + signing keys if the DB is missing.
+if [[ ! -f apps/issuer/data/db.sqlite ]]; then
+  echo "[start-all] seeding issuer roster + signing keys"
+  pnpm -F @firmus-novus/issuer seed
+fi
+
 # Apps.
 pnpm dev
