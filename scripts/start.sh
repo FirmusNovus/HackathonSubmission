@@ -59,12 +59,11 @@ for i in $(seq 1 60); do
 done
 
 step "Starting Otterscan (block explorer) on :${OTS_PORT}"
-# `--add-host` lets the otterscan container reach the host's :8545 (where
-# anvil-in-firmus-novus is exposed). Required on Linux; harmless on macOS/Win.
+# ERIGON_URL is read by the React app *in the browser*, so it must be a URL
+# the browser can resolve — `localhost`, not `host.docker.internal`.
 docker run -d --name "$OTS_NAME" \
-  --add-host=host.docker.internal:host-gateway \
   -p "${OTS_PORT}:80" \
-  -e ERIGON_URL="http://host.docker.internal:8545" \
+  -e ERIGON_URL="http://localhost:8545" \
   "$OTS_IMAGE" >/dev/null
 ok "otterscan started"
 

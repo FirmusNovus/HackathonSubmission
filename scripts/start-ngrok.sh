@@ -93,10 +93,12 @@ for i in $(seq 1 60); do
 done
 
 step "Starting Otterscan (block explorer) on :${OTS_PORT}"
+# ERIGON_URL is read by the React app *in the browser*. For local viewing use
+# localhost; for remote viewers via ngrok you'd need to also tunnel :8545
+# and override OTS_ERIGON_URL with that public URL.
 docker run -d --name "$OTS_NAME" \
-  --add-host=host.docker.internal:host-gateway \
   -p "${OTS_PORT}:80" \
-  -e ERIGON_URL="http://host.docker.internal:8545" \
+  -e ERIGON_URL="${OTS_ERIGON_URL:-http://localhost:8545}" \
   "$OTS_IMAGE" >/dev/null
 ok "otterscan started"
 
