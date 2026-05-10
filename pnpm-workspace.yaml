@@ -1,3 +1,23 @@
 packages:
-  - "apps/*"
-  - "packages/*"
+  - 'apps/*'
+  - 'packages/*'
+
+# Pin zod across the workspace. viem/abitype/ox have an unbounded `zod` peer
+# which lets pnpm float to whatever satisfies the resolver — including zod 4,
+# whose type-graph clashes with @hookform/resolvers' Zod 3 expectations and
+# breaks `next build`'s lint pass. Holding everyone to 3.24.x is fine since
+# all our direct usage is Zod 3 idioms.
+overrides:
+  zod: 3.24.4
+
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - better-sqlite3
+  - bufferutil
+  - esbuild
+  - keccak
+  - prisma
+  - sharp
+  - unrs-resolver
+  - utf-8-validate

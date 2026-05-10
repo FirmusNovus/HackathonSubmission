@@ -1,27 +1,21 @@
 /**
- * Path-routed reverse proxy fronting the three Lex Nova services.
+ * Path-routed reverse proxy fronting the Lex Nova services.
  *
- *   /api/issuer/bar/*  → bar-issuer  (port BAR_ISSUER_PORT,  default 3001)
- *   /api/issuer/pid/*  → pid-issuer  (port PID_ISSUER_PORT,  default 3002)
- *   *                  → platform    (port PLATFORM_PORT,    default 3010)
+ *   /api/issuer/bar/*  → issuer  (port ISSUER_PORT, default 3001)
+ *   /api/issuer/pid/*  → issuer  (same)
+ *   *                  → platform (port PLATFORM_PORT, default 3010)
  *
  * Listens on PROXY_PORT (default 3000) so the existing ngrok config
- * (`ngrok http 3000`) keeps working with no changes.
- *
- * Why three services behind one origin? ngrok free tier doesn't ship subdomains;
- * we need everything to resolve under the single reserved hostname. Path-based
- * routing here gives us process-level isolation (separate DBs, signing keys,
- * Node processes) while keeping the wallet's view of the world coherent — the
- * SD-JWT VC's `iss` URL is just `https://<host>/api/issuer/<kind>` and the
- * wallet fetches `.well-known/jwks.json` over the same host.
+ * (`ngrok http 3000`) keeps working with no changes. The bar + PID issuers
+ * are a single Next.js process serving both /api/issuer/{bar,pid}/* under
+ * one origin.
  */
 import http from "node:http";
 import type { Duplex } from "node:stream";
 import httpProxy from "http-proxy";
 
 const PROXY_PORT = Number(process.env.PROXY_PORT ?? 3000);
-const BAR_ISSUER_PORT = Number(process.env.BAR_ISSUER_PORT ?? 3001);
-const PID_ISSUER_PORT = Number(process.env.PID_ISSUER_PORT ?? 3002);
+const ISSUER_PORT = Number(process.env.ISSUER_PORT ?? 3001);
 const PLATFORM_PORT = Number(process.env.PLATFORM_PORT ?? 3010);
 
 const proxy = httpProxy.createProxyServer({
@@ -40,8 +34,7 @@ proxy.on("error", (err, _req, res) => {
 });
 
 function pickTarget(url: string): string {
-  if (url.startsWith("/api/issuer/bar")) return `http://127.0.0.1:${BAR_ISSUER_PORT}`;
-  if (url.startsWith("/api/issuer/pid")) return `http://127.0.0.1:${PID_ISSUER_PORT}`;
+  if (url.startsWith("/api/issuer/")) return `http://127.0.0.1:${ISSUER_PORT}`;
   return `http://127.0.0.1:${PLATFORM_PORT}`;
 }
 
@@ -71,9 +64,8 @@ server.on("upgrade", (req, socket, head) => {
 
 server.listen(PROXY_PORT, () => {
   console.log(`[proxy] listening on :${PROXY_PORT}`);
-  console.log(`  /api/issuer/bar/* → :${BAR_ISSUER_PORT}`);
-  console.log(`  /api/issuer/pid/* → :${PID_ISSUER_PORT}`);
-  console.log(`  *                 → :${PLATFORM_PORT}`);
+  console.log(`  /api/issuer/* → :${ISSUER_PORT}`);
+  console.log(`  *             → :${PLATFORM_PORT}`);
 });
 
 let shuttingDown = false;

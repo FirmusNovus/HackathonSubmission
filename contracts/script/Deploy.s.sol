@@ -2,69 +2,70 @@
 pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
-import {SchemaRegistry} from "@eas/SchemaRegistry.sol";
+
 import {EAS} from "@eas/EAS.sol";
+import {SchemaRegistry} from "@eas/SchemaRegistry.sol";
 import {ISchemaRegistry} from "@eas/ISchemaRegistry.sol";
 import {IEAS} from "@eas/IEAS.sol";
 
 import {AttestationManager} from "../src/AttestationManager.sol";
-import {StubZKConflictVerifier} from "../src/StubZKConflictVerifier.sol";
 import {LegalEngagementEscrow} from "../src/LegalEngagementEscrow.sol";
-import {IZKConflictVerifier} from "../src/interfaces/IZKConflictVerifier.sol";
-import {IAttestationManager} from "../src/interfaces/IAttestationManager.sol";
+import {StubZKConflictVerifier} from "../src/StubZKConflictVerifier.sol";
 
-/// @title Deploy
-/// @notice Deploys the SchemaRegistry, EAS, AttestationManager,
-///         StubZKConflictVerifier, and LegalEngagementEscrow contracts to the
-///         active RPC. Writes a JSON-shaped TypeScript file to
-///         apps/platform/lib/chain/addresses.ts so the platform binds against
-///         the just-deployed addresses.
+/// @notice Deploys the Firmus Novus MVP stack and writes the resulting
+///         addresses + schema UIDs to `apps/web/lib/chain/deployed-addresses.json`
+///         for the web app to load. On anvil (chainid 31337) deploys a fresh
+///         EAS + SchemaRegistry. Base Sepolia path is wired up but stubbed.
 contract Deploy is Script {
     function run() external {
-        uint256 operatorPk = vm.envUint("OPERATOR_PRIVATE_KEY");
-        address operator = vm.addr(operatorPk);
+        uint256 pk = vm.envUint("OPERATOR_PRIVATE_KEY");
+        address operator = vm.addr(pk);
 
-        vm.startBroadcast(operatorPk);
+        vm.startBroadcast(pk);
 
-        SchemaRegistry registry = new SchemaRegistry();
-        EAS eas = new EAS(ISchemaRegistry(address(registry)));
+        ISchemaRegistry schemaRegistry;
+        IEAS eas;
 
-        AttestationManager am = new AttestationManager(IEAS(address(eas)), ISchemaRegistry(address(registry)), operator);
-        StubZKConflictVerifier verifier = new StubZKConflictVerifier();
-        LegalEngagementEscrow escrow = new LegalEngagementEscrow(
-            IAttestationManager(address(am)), IZKConflictVerifier(address(verifier)), operator
-        );
+        if (block.chainid == 31337) {
+            SchemaRegistry sr = new SchemaRegistry();
+            EAS easImpl = new EAS(ISchemaRegistry(address(sr)));
+            schemaRegistry = ISchemaRegistry(address(sr));
+            eas = IEAS(address(easImpl));
+        } else if (block.chainid == 84532) {
+            // Base Sepolia — Phase 8 fills these in. Reverting for now so we
+            // don't accidentally deploy against a misconfigured testnet.
+            revert("Base Sepolia: canonical EAS+SchemaRegistry addresses set in Phase 8 (T095)");
+        } else {
+            revert("Unsupported chainid - extend Deploy.s.sol if you need a new chain");
+        }
+
+        StubZKConflictVerifier stubVerifier = new StubZKConflictVerifier();
+        AttestationManager manager = new AttestationManager(eas, schemaRegistry, operator);
+        LegalEngagementEscrow escrow = new LegalEngagementEscrow(manager, stubVerifier, operator);
 
         vm.stopBroadcast();
 
-        bytes32 schemaLawyer = am.SCHEMA_LAWYER();
-        bytes32 schemaClient = am.SCHEMA_CLIENT();
+        console.log("AttestationManager      ", address(manager));
+        console.log("LegalEngagementEscrow   ", address(escrow));
+        console.log("StubZKConflictVerifier  ", address(stubVerifier));
+        console.log("EAS                     ", address(eas));
+        console.log("SchemaRegistry          ", address(schemaRegistry));
+        console.logBytes32(manager.SCHEMA_LAWYER());
+        console.logBytes32(manager.SCHEMA_CLIENT());
+        console.logBytes32(manager.SCHEMA_ARBITER());
 
-        console.log("operator:", operator);
-        console.log("schemaRegistry:", address(registry));
-        console.log("eas:", address(eas));
-        console.log("attestationManager:", address(am));
-        console.log("stubZKVerifier:", address(verifier));
-        console.log("legalEngagementEscrow:", address(escrow));
-        console.logBytes32(schemaLawyer);
-        console.logBytes32(schemaClient);
+        string memory key = "deployed";
+        vm.serializeAddress(key, "ATTESTATION_MANAGER_ADDRESS", address(manager));
+        vm.serializeAddress(key, "LEGAL_ENGAGEMENT_ESCROW_ADDRESS", address(escrow));
+        vm.serializeAddress(key, "ZK_VERIFIER_ADDRESS", address(stubVerifier));
+        vm.serializeAddress(key, "EAS_ADDRESS", address(eas));
+        vm.serializeAddress(key, "SCHEMA_REGISTRY_ADDRESS", address(schemaRegistry));
+        vm.serializeBytes32(key, "SCHEMA_LAWYER", manager.SCHEMA_LAWYER());
+        vm.serializeBytes32(key, "SCHEMA_CLIENT", manager.SCHEMA_CLIENT());
+        string memory json = vm.serializeBytes32(key, "SCHEMA_ARBITER", manager.SCHEMA_ARBITER());
 
-        string memory ts = string.concat(
-            "// Auto-generated by contracts/script/Deploy.s.sol -- do not edit.\n",
-            "// Owner spec: 001-verified-legal-engagement.\n",
-            "export const ADDRESSES = {\n",
-            "  operator: '", vm.toString(operator), "' as const,\n",
-            "  schemaRegistry: '", vm.toString(address(registry)), "' as const,\n",
-            "  eas: '", vm.toString(address(eas)), "' as const,\n",
-            "  attestationManager: '", vm.toString(address(am)), "' as const,\n",
-            "  stubZKVerifier: '", vm.toString(address(verifier)), "' as const,\n",
-            "  legalEngagementEscrow: '", vm.toString(address(escrow)), "' as const,\n",
-            "} as const;\n",
-            "\nexport const SCHEMA_UIDS = {\n",
-            "  lawyer: '", vm.toString(schemaLawyer), "' as const,\n",
-            "  client: '", vm.toString(schemaClient), "' as const,\n",
-            "} as const;\n"
-        );
-        vm.writeFile("../apps/platform/lib/chain/addresses.ts", ts);
+        string memory outPath = string.concat(vm.projectRoot(), "/../apps/web/lib/chain/deployed-addresses.json");
+        vm.writeJson(json, outPath);
+        console.log("Wrote", outPath);
     }
 }

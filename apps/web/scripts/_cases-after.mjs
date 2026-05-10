@@ -1,0 +1,10 @@
+import { chromium } from "@playwright/test";
+const SARAH = "0x2222000000000000000000000000000000000001";
+const browser = await chromium.launch({ headless: true });
+const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 });
+const page = await ctx.newPage();
+await page.goto(`http://localhost:3000/dev/sign-in?wallet=${SARAH}&role=client&redirect=/client/cases`, { waitUntil: "domcontentloaded" });
+await page.waitForTimeout(2000);
+await page.screenshot({ path: "/tmp/cases-after.png", fullPage: false });
+await browser.close();
+console.log("done");

@@ -1,0 +1,13 @@
+import { chromium } from "@playwright/test";
+const SARAH = "0x2222000000000000000000000000000000000001";
+const browser = await chromium.launch({ headless: true });
+const ctx = await browser.newContext({ viewport: { width: 1280, height: 200 }, deviceScaleFactor: 2 });
+const page = await ctx.newPage();
+await page.goto(`http://localhost:3000/dev/sign-in?wallet=${SARAH}&role=client&redirect=/client/home`, { waitUntil: "domcontentloaded" });
+await page.waitForTimeout(1500);
+await page.screenshot({ path: "/tmp/nav-client-home.png", clip: { x: 0, y: 0, width: 1280, height: 80 } });
+await page.goto(`http://localhost:3000/lawyers`, { waitUntil: "domcontentloaded" });
+await page.waitForTimeout(1500);
+await page.screenshot({ path: "/tmp/nav-lawyers.png", clip: { x: 0, y: 0, width: 1280, height: 110 } });
+await browser.close();
+console.log("done");

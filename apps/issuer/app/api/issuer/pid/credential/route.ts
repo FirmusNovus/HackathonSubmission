@@ -1,24 +1,28 @@
-// Owner spec: 001-verified-legal-engagement.
-// PID credential endpoint — issues SD-JWT VC `urn:eudi:pid:1`.
+import { NextRequest, NextResponse } from "next/server";
+import { type JWK } from "jose";
 
-import { NextRequest, NextResponse } from 'next/server';
-import type { JWK } from 'jose';
-import { readAccessToken, markIssued } from '@firmus-novus/oid4vci';
-import { issueSdJwtVc } from '@firmus-novus/sd-jwt';
-import { issuerBaseUrl, loadSigningKey } from '@/lib/keys';
-import { findPidById } from '@/lib/persona-lookup';
-import { getDb } from '@/lib/db/client';
+import { readAccessToken, markIssued } from "@firmus/oid4vci";
+import { issueSdJwtVc } from "@firmus/sd-jwt";
+import { issuerBaseUrl, loadSigningKey } from "@/lib/keys";
+import { findSubjectById } from "@/lib/persona-lookup-pid";
+import { getDb } from "@/lib/db";
 
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
 
+/**
+ * PID credential endpoint. Mirrors the bar credential endpoint but with the
+ * EUDI PID claim shape — full ARF claim set including the nested address,
+ * place_of_birth, and age_equal_or_over objects.
+ */
 export async function POST(req: NextRequest) {
-  const auth = (req.headers.get('authorization') ?? '').replace(/^(Bearer|DPoP)\s+/i, '');
+  const auth = (req.headers.get("authorization") ?? "").replace(/^(Bearer|DPoP)\s+/i, "");
   const session = readAccessToken(getDb(), auth);
-  if (!session || session.kind !== 'pid') {
-    return NextResponse.json({ error: 'invalid_token' }, { status: 401 });
+  if (!session || session.kind !== "pid") {
+    return NextResponse.json({ error: "invalid_token" }, { status: 401 });
   }
 
   const body = (await req.json()) as {
+    format?: string;
     proof?: { proof_type?: string; jwt?: string };
     proofs?: { jwt?: string[] | string };
   };
@@ -29,48 +33,53 @@ export async function POST(req: NextRequest) {
   } else if (body.proof?.jwt) {
     proofJwts = [body.proof.jwt];
   } else {
-    return NextResponse.json({ error: 'missing proof' }, { status: 400 });
+    return NextResponse.json({ error: "missing proof" }, { status: 400 });
   }
 
-  const subject = findPidById(session.persona_id);
+  const subject = findSubjectById(session.persona_id);
   if (!subject) {
-    return NextResponse.json({ error: 'no PID attributes for subject' }, { status: 500 });
+    return NextResponse.json({ error: "no PID attributes for subject" }, { status: 500 });
   }
 
-  // Compute derived fields at issuance time.
-  const birthDateMs = Date.parse(subject.birthdate + 'T00:00:00Z');
+  const issuerHttpsUrl = issuerBaseUrl("pid");
+
+  // Compute derived fields at issuance time
+  const birthDateMs = Date.parse(subject.birthdate + "T00:00:00Z");
   const nowMs = Date.now();
   const ageMs = nowMs - birthDateMs;
-  const ageInYears = Math.floor(ageMs / (365.25 * 24 * 3600 * 1000));
+  const ageYearsExact = ageMs / (365.25 * 24 * 3600 * 1000);
+  const ageInYears = Math.floor(ageYearsExact);
   const ageBirthYear = parseInt(subject.birthdate.slice(0, 4), 10);
+
   const tenYearsSeconds = 60 * 60 * 24 * 365 * 10;
   const nowSeconds = Math.floor(nowMs / 1000);
   const validUntilUnix = nowSeconds + tenYearsSeconds;
   const dateOfIssuance = new Date(nowMs).toISOString().slice(0, 10);
   const dateOfExpiry = new Date(validUntilUnix * 1000).toISOString().slice(0, 10);
 
-  const signingKey = await loadSigningKey('pid');
-  const issuerHttpsUrl = issuerBaseUrl('pid');
+  const signingKey = await loadSigningKey("pid");
 
   const credentials: string[] = [];
   for (const jwt of proofJwts) {
     let holderJwk: JWK | null = null;
     try {
-      const headerB64 = jwt.split('.')[0];
-      const header = JSON.parse(Buffer.from(headerB64!, 'base64url').toString('utf-8'));
+      const headerB64 = jwt.split(".")[0];
+      const header = JSON.parse(Buffer.from(headerB64, "base64url").toString("utf-8"));
       if (header.jwk) holderJwk = header.jwk as JWK;
     } catch {
       // proof JWT malformed
     }
     if (!holderJwk) {
-      return NextResponse.json({ error: 'proof JWT missing inline jwk in header' }, { status: 400 });
+      return NextResponse.json({ error: "proof JWT missing inline jwk in header" }, { status: 400 });
     }
+
     const issued = await issueSdJwtVc({
       signingKey,
-      vct: 'urn:eudi:pid:1',
+      vct: "urn:eudi:pid:1",
       issuerHttpsUrl,
       holderCnfJwk: holderJwk,
       disclosableClaims: {
+        // Top-level disclosable claims (mirrors spike's PID_DISCLOSURE_FRAME _sd list)
         given_name: subject.given_name,
         family_name: subject.family_name,
         birth_given_name: subject.birth_given_name,
@@ -90,6 +99,8 @@ export async function POST(req: NextRequest) {
         date_of_expiry: dateOfExpiry,
         date_of_issuance: dateOfIssuance,
       },
+      // Nested SD-frames: each parent has its own _sd array. EUDI ARF / wwWallet
+      // expect this exact shape (path: ["address", "country"], path: ["age_equal_or_over", "18"]).
       nestedDisclosableClaims: {
         place_of_birth: {
           locality: subject.place_of_birth.locality,
@@ -106,24 +117,26 @@ export async function POST(req: NextRequest) {
           country: subject.address.country,
         },
         age_equal_or_over: {
-          '14': ageInYears >= 14,
-          '16': ageInYears >= 16,
-          '18': ageInYears >= 18,
-          '21': ageInYears >= 21,
-          '65': ageInYears >= 65,
+          "14": ageInYears >= 14,
+          "16": ageInYears >= 16,
+          "18": ageInYears >= 18,
+          "21": ageInYears >= 21,
+          "65": ageInYears >= 65,
         },
       },
       expiresAtUnix: validUntilUnix,
     });
     credentials.push(issued.envelope);
   }
+
   markIssued(getDb(), auth);
+
   return NextResponse.json(
     {
-      format: 'vc+sd-jwt',
+      format: "vc+sd-jwt",
       credential: credentials[0],
       credentials: credentials.map((c) => ({ credential: c })),
     },
-    { headers: { 'Cache-Control': 'no-store' } },
+    { headers: { "Cache-Control": "no-store" } }
   );
 }

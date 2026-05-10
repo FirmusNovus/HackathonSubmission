@@ -1,0 +1,320 @@
+// Firmus Novus — database schema
+// All monetary fields hold ETH amounts as Decimal. Column names that end in
+// `EUR` are a pre-pivot artefact; the values are ETH. Renaming the columns
+// (consultationFeeEUR → consultationFeeETH, etc.) is a follow-up migration
+// we deferred to keep the hackathon-pivot diff small.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite has no native enum support. The following fields use plain String columns
+// with values constrained at the application boundary (see lib/db/enums.ts):
+//   role               : "CLIENT" | "LAWYER"
+//   verificationStatus : "PENDING" | "VERIFIED" | "REJECTED"
+//   status (Booking)   : "REQUESTED" | "ACCEPTED" | "DECLINED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "DISPUTED"
+//   status (Engagement): "ACTIVE" | "CLOSED"
+//   status (Order)     : "REQUESTED" | "DECLINED" | "CANCELLED" | "ACCEPTED" | "COMPLETED" | "DISPUTED"
+//   pricingKind        : "HOURLY" | "FIXED" | "SUBSCRIPTION" | "SUCCESS"
+
+model User {
+  id                 String    @id @default(cuid())
+  walletAddress      String    @unique
+  role               String
+  email              String?   @unique
+  name               String?
+  avatarUrl          String?
+  ebsiWalletProvider String?
+  ageVerifiedAt      DateTime?
+  // EAS attestations written on chain by /api/onboarding/{client,lawyer}/finalize.
+  // Lawyers get both: the bar attestation is what gates engagements on chain;
+  // the client (PID) attestation marks them as EU-resident + 18+, same as any
+  // other user. For non-lawyer users only `clientAttestationUid` is set.
+  clientAttestationUid String?
+  lawyerAttestationUid String?
+  attestedAt         DateTime?
+  // Phase 10: each user derives an X25519 encryption keypair from a wallet
+  // signature ("Firmus Novus encryption key v1"). The PUBLIC half lives
+  // here, base64-encoded; the private half stays in the user's browser.
+  // Counterparties fetch this via /api/users/[id]/encryption-key to encrypt
+  // outgoing messages so the platform only ever sees ciphertext.
+  encryptionPublicKey String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  lawyerProfile     LawyerProfile?
+  clientBookings    Booking[]      @relation("ClientBookings")
+  clientEngagements Engagement[]   @relation("ClientEngagements")
+  conversations     Conversation[] @relation("ConversationParticipants")
+  messages          Message[]
+  disputeArchives   DisputeArchive[]
+}
+
+model Nonce {
+  id        String   @id @default(cuid())
+  nonce     String   @unique
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// OID4VP verifier state. One row per credential-presentation request. The
+// platform stores the signed request_object it'll serve to the wallet, then
+// receives the wallet's vp_token at /api/verifier/response/[state] and
+// updates the row with the disclosed claims.
+//
+// Status: "pending" → "verified" | "rejected".
+// `verifiedAttrs` and `holderJwk` are JSON-serialized strings (SQLite has no
+// native JSON). `redactVerifiedAttrs` clears them after finalize consumes them.
+model VerifierState {
+  state           String    @id
+  kind            String // "pid" | "bar"
+  nonce           String
+  requestJws      String
+  status          String    @default("pending") // pending | verified | rejected
+  verifiedAttrs   String?
+  holderJwk       String?
+  rejectedReason  String?
+  createdAt       DateTime  @default(now())
+  completedAt     DateTime?
+}
+
+model LawyerProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  city               String
+  headline           String
+  bio                String
+  // SQLite has no native arrays. The following are JSON-encoded String[] — use
+  // helpers in lib/db/json-fields.ts to read/write.
+  specialties        String   @default("[]")
+  languages          String   @default("[]")
+  jurisdictions      String   @default("[]")
+  pricingKind        String
+  pricingHeadline    String
+  hourlyRateEUR      Decimal
+  consultationRate30 Decimal
+  consultationRate60 Decimal
+  pricingItems       String   @default("[]")
+  yearsExperience    Int
+  verificationStatus String   @default("PENDING")
+  ebsiCredentialId   String?
+  barRegistrationNum String
+  barJurisdiction    String
+  admissionDate      DateTime
+  credentialDocsUrl  String   @default("[]")
+  rating             Float    @default(0)
+  reviewCount        Int      @default(0)
+  // JSON-encoded availability object (nullable).
+  availability       String?
+  tags               String   @default("[]")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  bookings    Booking[]
+  engagements Engagement[]
+}
+
+// Booking is the consultation that opens an engagement. Phase 8 reshape:
+// - line items + deliverables are gone — the consultation IS the deliverable;
+//   the price comes from the lawyer's published consultationRate × duration
+// - engagementId (chain id) moved to Engagement.engagementIdOnChain
+// - new engagementId String? is an FK to Engagement, set when the consultation
+//   funds (until then, no engagement exists yet)
+model Booking {
+  id                 String        @id @default(cuid())
+  clientId           String
+  client             User          @relation("ClientBookings", fields: [clientId], references: [id])
+  lawyerProfileId    String
+  lawyerProfile      LawyerProfile @relation(fields: [lawyerProfileId], references: [id])
+  scheduledAt        DateTime
+  durationMinutes    Int
+  clientAcceptedAt   DateTime?
+  lawyerAcceptedAt   DateTime?
+  consultationFeeEUR Decimal
+  platformFeeEUR     Decimal
+  status             String        @default("REQUESTED")
+  caseDescription    String
+  practiceArea       String
+  escrowTxHash       String?
+  escrowReleaseHash  String?
+  // EIP-712 signatures proving each commitment action was authorised by
+  // the actor's wallet, not just by an authenticated session. The client's
+  // sig accompanies POST /api/bookings; the lawyer's sig accompanies POST
+  // /api/bookings/[id]/accept. Both nullable for forward compatibility but
+  // required at the API layer for new flows.
+  clientRequestSignature String?
+  clientRequestNonce     String?
+  lawyerAcceptSignature  String?
+  lawyerAcceptNonce      String?
+  // Mutual refund (Phase 9). Both parties sign the same EIP-712
+  // MutualRefundAuthorization{engagementId, milestoneIndex} over the
+  // contract's domain ("LexNovaEscrow", "1"). Whoever signs second submits
+  // the on-chain mutualRefundMilestone tx; `escrowRefundHash` is set when
+  // /api/bookings/[id]/refunded confirms the MilestoneMutuallyRefunded event.
+  clientRefundSignature  String?
+  lawyerRefundSignature  String?
+  escrowRefundHash       String?
+  refundProposedAt       DateTime?
+  refundProposedBy       String?    // CLIENT | LAWYER
+  // Dispute / arbiter resolution (Phase 11). Either party can open a dispute
+  // on an in-escrow milestone via the contract's `disputeMilestone` /
+  // `escalateMilestone`. The operator-as-arbiter resolves with a split via
+  // `resolveDispute(eid, msIdx, toLawyer, toClient)`. The amounts are
+  // duplicated in the DB for UI convenience; chain remains source of truth.
+  disputedAt              DateTime?
+  disputeOpenedBy         String?   // CLIENT | LAWYER
+  disputeOpenTxHash       String?
+  disputeResolvedAt       DateTime?
+  disputeResolveTxHash    String?
+  disputeAmountToLawyer   Decimal?
+  disputeAmountToClient   Decimal?
+  // FK to the Engagement opened by this consultation's funding tx. Null
+  // until the client's `openEngagementAndFundFirstMilestone` confirms.
+  engagementId       String?       @unique
+  engagement         Engagement?   @relation(fields: [engagementId], references: [id])
+  notes              String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  conversation Conversation?
+}
+
+// Engagement = a chain-level legal engagement between client + lawyer. Opened
+// by the consultation funding tx; subsequent follow-up Orders are milestones
+// 1..N on the same engagement. Closes when both parties have settled all
+// milestones (Phase 9 territory).
+model Engagement {
+  id                  String        @id @default(cuid())
+  clientId            String
+  client              User          @relation("ClientEngagements", fields: [clientId], references: [id])
+  lawyerProfileId     String
+  lawyerProfile       LawyerProfile @relation(fields: [lawyerProfileId], references: [id])
+  // bytes32 hex string — keccak256(bookingId). Stable identifier on chain that
+  // links the consultation's bookingId to the Engagement. Unique because the
+  // contract enforces nullifier uniqueness via zkConflictProof.
+  matterRef           String        @unique
+  // uint256 from the contract's openEngagementAndFundFirstMilestone return.
+  // Capped at int32 here for SQLite storage; bail at the API layer if a real
+  // chain ever returns something larger (see /api/bookings/[id]/funded).
+  engagementIdOnChain Int           @unique
+  status              String        @default("ACTIVE") // ACTIVE | CLOSED
+  openedAt            DateTime      @default(now())
+  closedAt            DateTime?
+
+  booking Booking?
+  orders  Order[]
+}
+
+// Follow-up order on an existing engagement. Lawyer-created, single-amount,
+// async (no scheduledAt). Each order maps to one chain milestone (index 1+,
+// since 0 is the consultation). Status drives the same fund→release loop
+// as the consultation, but on `fundMilestone` instead of
+// `openEngagementAndFundFirstMilestone`.
+model Order {
+  id                String     @id @default(cuid())
+  engagementId      String
+  engagement        Engagement @relation(fields: [engagementId], references: [id])
+  description       String
+  amountETH         Decimal
+  status            String     @default("REQUESTED") // REQUESTED | DECLINED | CANCELLED | ACCEPTED | COMPLETED | DISPUTED
+  // milestoneIndex on chain. Set when the client funds (server reads it from
+  // the MilestoneFunded event); null while the order is still REQUESTED.
+  milestoneIndex    Int?
+  escrowTxHash      String?
+  escrowReleaseHash String?
+  // EIP-712 signature the lawyer made when sending this follow-up order.
+  // Same shape as Booking.clientRequestSignature: typed-data over the
+  // engagement, description hash, amount, and a nonce. Recovered at POST
+  // /api/orders and rejected if it doesn't match the SIWE-bound lawyer.
+  lawyerCreateSignature String?
+  lawyerCreateNonce     String?
+  // Mutual refund (Phase 9). Same model as Booking — both parties sign the
+  // typed data, second signer submits the chain tx.
+  clientRefundSignature String?
+  lawyerRefundSignature String?
+  escrowRefundHash      String?
+  refundProposedAt      DateTime?
+  refundProposedBy      String?    // CLIENT | LAWYER
+  // Dispute / arbiter resolution (Phase 11) — same shape as Booking.
+  disputedAt              DateTime?
+  disputeOpenedBy         String?
+  disputeOpenTxHash       String?
+  disputeResolvedAt       DateTime?
+  disputeResolveTxHash    String?
+  disputeAmountToLawyer   Decimal?
+  disputeAmountToClient   Decimal?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+}
+
+/**
+ * Per-party encrypted archive of the conversation, submitted to the arbiter
+ * when a dispute is open. Each row is one party's account: their privkey
+ * could decrypt every message in the conversation, so they re-encrypt each
+ * to the arbiter's pubkey and post the bundle here. The arbiter sees both
+ * archives; discrepancies are themselves evidence.
+ *
+ * `encryptedBundle` is JSON: an array of
+ *   { originalMessageId, ciphertextForArbiter, nonce, originalSenderId,
+ *     originalSenderEncryptionPublicKey, originalCreatedAt }
+ * where the ciphertext was produced by `nacl.box(plaintext, nonce,
+ * arbiterPub, submitterPriv)`. Arbiter decrypts with `nacl.box.open(ct,
+ * nonce, submitterPub, arbiterPriv)`.
+ */
+model DisputeArchive {
+  id              String   @id @default(cuid())
+  bookingId       String?
+  orderId         String?
+  submittedById   String
+  submittedBy     User     @relation(fields: [submittedById], references: [id])
+  // Sender's pubkey at submission time, so the arbiter knows which key to
+  // pair with their own privkey when decrypting (NaCl box's ECDH is
+  // symmetric — arbiter uses (submitterPub, arbiterPriv); submitter
+  // encrypted with (arbiterPub, submitterPriv)).
+  submitterEncryptionPublicKey String
+  encryptedBundle String   // JSON
+  submittedAt     DateTime @default(now())
+
+  @@index([bookingId])
+  @@index([orderId])
+}
+
+model Conversation {
+  id           String   @id @default(cuid())
+  bookingId    String?  @unique
+  booking      Booking? @relation(fields: [bookingId], references: [id])
+  participants User[]   @relation("ConversationParticipants")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  messages Message[]
+}
+
+// Phase 10: messages are end-to-end encrypted with NaCl box (X25519 ECDH +
+// xsalsa20-poly1305). The platform only sees ciphertext + nonce + sender
+// pubkey. Old seeded rows have plaintext `content` and no ciphertext —
+// rendered as legacy demo data and visually distinguished in the UI.
+model Message {
+  id                          String       @id @default(cuid())
+  conversationId              String
+  conversation                Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId                    String
+  sender                      User         @relation(fields: [senderId], references: [id])
+  // Legacy plaintext content. Kept nullable so existing seeded rows still
+  // read; new messages must use the encrypted fields below.
+  content                     String?
+  ciphertext                  String?
+  nonce                       String?
+  senderEncryptionPublicKey   String?
+  attachmentUrl               String?
+  attachmentType              String?
+  createdAt                   DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+}

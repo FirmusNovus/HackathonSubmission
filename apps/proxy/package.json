@@ -1,16 +1,18 @@
 {
-  "name": "@firmus-novus/proxy",
+  "name": "@firmus/proxy",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {},
+  "dependencies": {
+    "http-proxy": "^1.18.1"
+  },
   "devDependencies": {
-    "@types/node": "^20",
+    "@types/http-proxy": "^1.17.15",
+    "@types/node": "^22.10.2",
     "tsx": "^4.21.0",
     "typescript": "^5.7.2"
   }

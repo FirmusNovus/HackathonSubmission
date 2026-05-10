@@ -1,56 +1,63 @@
-// Owner spec: 001-verified-legal-engagement.
-// POST {personaId} → creates a pre-auth offer + returns wwWallet handoff URL.
-// Bar credentials are roster-gated: only persona IDs that exist with
-// credential_type='bar' can mint. The platform UI only exposes lawyer
-// personas as bar mint targets.
+import { NextRequest, NextResponse } from "next/server";
+import { isAddress, type Address } from "viem";
 
-import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
-import { createOffer } from '@firmus-novus/oid4vci';
-import { getDb } from '@/lib/db/client';
-import { findBarById } from '@/lib/persona-lookup';
+import { createOffer } from "@firmus/oid4vci";
+import { getDb } from "@/lib/db";
+import { issuerBaseUrl } from "@/lib/keys";
+import { findSubjectByAddress } from "@/lib/persona-lookup-bar";
 
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
 
-const Body = z.object({ personaId: z.number().int().positive() });
-
+/**
+ * Mints a credential offer for a given wallet address. The address must
+ * correspond to a row in this issuer's `subjects` table — i.e., a registered
+ * bar-admitted lawyer. No SIWE here: the issuer is its own institution and
+ * doesn't share a session with lex-nova. Anyone may *ask* for an offer; only
+ * registered subjects get one minted, and the OID4VCI ceremony binds the
+ * actual issuance to the wallet's holder key.
+ */
 export async function POST(req: NextRequest) {
-  const parsed = Body.safeParse(await req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'missing personaId' }, { status: 400 });
+  let body: { subjectAddress?: string };
+  try {
+    body = (await req.json()) as { subjectAddress?: string };
+  } catch {
+    body = {};
   }
-
-  const subject = findBarById(parsed.data.personaId);
-  if (!subject) {
+  const subjectAddress = body.subjectAddress;
+  if (!subjectAddress || !isAddress(subjectAddress)) {
     return NextResponse.json(
-      {
-        error: 'not on bar roster',
-        detail: 'No bar accreditation on file for this persona.',
-      },
-      { status: 403 },
+      { error: "missing or invalid subjectAddress" },
+      { status: 400 }
     );
   }
 
-  const issuerHost = process.env.PUBLIC_HOSTNAME?.replace(/\/$/, '');
-  if (!issuerHost) {
-    return NextResponse.json({ error: 'PUBLIC_HOSTNAME not set' }, { status: 500 });
+  const subject = findSubjectByAddress(subjectAddress as Address);
+  if (!subject) {
+    return NextResponse.json(
+      {
+        error: "no bar profile for this address",
+        detail:
+          "This wallet isn't on the bar association's roster of admitted lawyers. Use one of the lawyer-allocated anvil accounts.",
+      },
+      { status: 400 }
+    );
   }
 
-  const baseUrl = `${issuerHost}/api/issuer/bar`;
-  const { offerId } = createOffer(getDb(), 'bar', subject.id);
+  const baseUrl = issuerBaseUrl("bar");
+
+  const { offerId } = createOffer(getDb(), "bar", subject.id);
+  const configurationId = "LegalProfessionalAccreditation_sdjwt";
   const offerUri = `${baseUrl}/credential-offer/${offerId}`;
-  const wwwalletUrl = `https://demo.wwwallet.org/cb?credential_offer_uri=${encodeURIComponent(offerUri)}`;
+
   const deepLink = `openid-credential-offer://?credential_offer_uri=${encodeURIComponent(offerUri)}`;
+  const wwwalletUrl = `https://demo.wwwallet.org/cb?credential_offer_uri=${encodeURIComponent(offerUri)}`;
 
   return NextResponse.json({
     offerId,
+    configurationId,
     offerUri,
     deepLink,
     wwwalletUrl,
-    persona: {
-      display_name: subject.display_name,
-      jurisdiction: subject.jurisdiction,
-      bar_admission_number: subject.bar_admission_number,
-    },
+    persona: { display_name: subject.display_name },
   });
 }

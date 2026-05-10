@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 interface IAttestationManager {
     function SCHEMA_LAWYER() external view returns (bytes32);
     function SCHEMA_CLIENT() external view returns (bytes32);
+    function SCHEMA_ARBITER() external view returns (bytes32);
 
     function hasCapability(address subject, bytes32 schemaId) external view returns (bool);
 
@@ -18,6 +19,8 @@ interface IAttestationManager {
     function attestVerifiedClient(address subject, string calldata countryOfResidence, bool ageOver18)
         external
         returns (bytes32 uid);
+
+    function attestVerifiedArbiter(address subject, string calldata note) external returns (bytes32 uid);
 
     function revokeCapability(address subject, bytes32 schemaId) external;
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@firmus-novus/oid4vci",
+  "name": "@firmus/oid4vci",
   "version": "0.1.0",
   "private": true,
   "main": "./src/index.ts",
@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^20",
     "typescript": "^5.7.2"
   }
 }

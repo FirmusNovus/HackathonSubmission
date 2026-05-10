@@ -1,5 +1,5 @@
 {
-  "name": "@firmus-novus/dcql",
+  "name": "@firmus/dcql",
   "version": "0.1.0",
   "private": true,
   "main": "./src/index.ts",

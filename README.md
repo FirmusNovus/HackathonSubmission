@@ -1,247 +1,251 @@
 # Firmus Novus
 
-> Verified Legal Counsel, On-Chain.
+A privacy-preserving European legal-services marketplace. Lawyers prove their bar admission via EUDI bar credentials; clients prove they're EU-resident adults via their PID; both are anchored on chain by the operator as EAS attestations. Engagements run as milestone-based escrow with mutual refunds and arbiter-resolved disputes.
 
-A verified-pseudonymous legal-engagement marketplace. Clients prove
-they are real EU residents via selective-disclosure of an EU resident
-credential; lawyers prove they are admitted to a real EU bar via
-selective-disclosure of a bar-membership credential. Engagements are
-brokered through escrow on chain; messages between the parties are
-end-to-end encrypted with keys derived from their wallets. The
-platform stores ciphertext and on-chain attestation references; it
-cannot decrypt messages, unseal client identity, or forge a credential.
+This README covers **deploying the system for jury/demo evaluation**. For development workflow see `scripts/dev-reset.sh` and `pnpm dev`.
 
-## Status
+---
 
-MVP slice (US1–US7) is implemented and verified end-to-end on local
-Anvil. Test pyramid:
-
-- **Foundry** — 23/23 Solidity tests (asymmetric mechanism boundary
-  cases, capability gates, full proposal lifecycle, mutual refund,
-  sum-equality split, concurrent-transition revert).
-- **Vitest** — 11/11 unit tests on the crypto package
-  (`@firmus-novus/crypto`): ECDH key-pair derivation + both-sides
-  shared-secret equality, AES-GCM round-trip with fresh IV/salt per
-  message + tamper detection + wrong-key rejection, depth-16
-  incremental Merkle determinism + order-dependence.
-- **Scenario suite** — 20/20 end-to-end scenarios at
-  [`scripts/scenarios/`](scripts/scenarios/), runnable via
-  `bash scripts/scenarios/run-all.sh`. Coverage:
-  - S1 — FREE consultation (no on-chain release)
-  - S2 — client cancels PAID, mutual refund
-  - S3 — lawyer declines PAID, mutual refund
-  - S4 — lawyer escalation (anvil-time-skip 30 days)
-  - S5 — message-API security (plaintext rejected, non-participant
-        blocked, no plaintext column)
-  - S6 — chain-as-arbiter under parallel race
-  - S7 — role-gating (404-on-mismatch)
-  - S8 / S8b — multi-proposal lifecycle + forged-offer rejection
-  - S9 — input validation across mutating routes
-  - S10 — terminal-state guards + nullifier replay
-  - S11 — engagement closure
-  - S12 — FREE consultation + PAID follow-up
-  - S13 — 10 simultaneous engagements between same parties
-  - S14 — Unicode + 100KB ciphertext round-trip
-  - S15 — direct-chain tampering (every contract gate holds)
-  - S16 — large payloads (4KB description + 100KB ciphertext)
-  - S17 — 8 follow-up proposals on one engagement
-  - S18 — SSR render coverage + role-aware status banners
-  - S19 — operator revokes capability mid-flow + indexer mirrors
-- **Smoke test** — end-to-end demo: 6 personas seeded with EAS
-  attestations on chain, paid consultation booked + funded +
-  accepted + completed, then a separate consultation disputed +
-  resolved 50/50 by the operator.
-- **CI gates** — no-server-decryption, feature-isolation,
-  brand-mentions all green.
-- **Typecheck** — strict TS clean across the workspace.
-
-What's wired in the UI:
-
-- Marketing landing + verified-lawyer directory + lawyer profile
-  with live `hasCapability` check.
-- `/connect` role chooser; dev-bypass persona picker at
-  `/dev/personas` (writes EAS attestations from operator key).
-- Client booking flow that broadcasts
-  `openPaidEngagementAndFundConsultation` / `openFreeEngagement`.
-- Lawyer dashboard with stat cards, recent requests, active
-  engagements (one-click "New proposal"), and an Active-disputes
-  warning card.
-- Consultation room: dark-mode workspace with E2EE chat
-  (per-engagement P-256 ECDH + AES-GCM-256 in the browser),
-  proposals panel with role-keyed action buttons (accept-and-fund,
-  mark-delivered, release, dispute, escalate, mark-complete), and
-  status banners for REQUESTED / DECLINED / CANCELLED / COMPLETED.
-- Operator dispute queue + resolve form (sum-equality client-side
-  validation matching the contract require).
-- Lawyer "issue follow-up proposal" form with line items +
-  deliverables + 5% platform-fee preview.
-
-What's stubbed for the wwWallet integration session:
-
-- The OID4VCI/OID4VP wire shapes (issuer `.well-known` endpoints,
-  verifier request/response routes) are scaffolded in the spec but
-  the full wwWallet handshake is exercised via `DEV_BYPASS_EUDI=1`
-  for now. Tomorrow's session pairs the `/connect` steppers with
-  the live wwWallet.
-- US8 avatar upload UI; the contract surface and DB schema work.
-
-## Layout
-
-```text
-.
-├── .specify/                        # Spec Kit toolkit
-│   ├── memory/constitution.md         #   project constitution (v1.1.0)
-│   ├── templates/                     #   scaffold templates for /speckit-* skills
-│   ├── scripts/                       #   bash helpers
-│   └── feature.json                   #   pointer at the active feature directory
-├── .claude/
-│   └── skills/speckit-*/              # /speckit-constitution, /speckit-specify, …
-├── specs/
-│   └── 001-verified-legal-engagement/ # the active feature spec
-│       ├── spec.md                      # what the platform does (8 user stories, 64 FRs)
-│       ├── plan.md                      # tech stack + project structure + constitution check
-│       ├── research.md                  # 14 technical decisions inside the user-pinned envelope
-│       ├── data-model.md                # on-chain + SQLite schemas, state machines, validation rules
-│       ├── contracts/                   # interface contracts (Solidity, API, EAS schemas, credential shapes, messaging)
-│       ├── quickstart.md                # 10-minute bring-up guide
-│       ├── tasks.md                     # 178 numbered tasks across 11 phases
-│       └── checklists/requirements.md   # spec-quality validation
-├── design/                          # design system (tokens, components, page maps)
-│   ├── README.md
-│   ├── foundations/                   # color, type, spacing, motion, accessibility, copy
-│   ├── css/                           # tokens.css, base.css, components.css, globals.css
-│   ├── components.md                  # component catalog
-│   └── pages.md                       # all twelve views with layout maps
-├── CLAUDE.md                        # agent context — points at the active plan
-├── README.md                        # this file
-└── .gitignore                       # build artifacts, secrets, local-only state
-```
-
-When implementation begins (per `specs/001-verified-legal-engagement/tasks.md`),
-the workspace will grow:
-
-```text
-├── apps/
-│   ├── platform/                    # the application (Next.js, port 3010)
-│   ├── issuer/                      # credential issuer (Next.js, port 3001)
-│   └── proxy/                       # path-routed reverse proxy (Node, port 3000)
-├── packages/
-│   ├── crypto/                      # WebCrypto helpers (browser-only)
-│   ├── dcql/                        # DCQL builders
-│   ├── sd-jwt/                      # SD-JWT VC parse / verify / sign
-│   ├── oid4vci/                     # OID4VCI flow helpers
-│   └── db-toolkit/                  # better-sqlite3 wrapper
-├── contracts/                       # Foundry: AttestationManager, LegalEngagementEscrow, StubZKConflictVerifier
-├── circuits/                        # Noir (production trajectory only)
-├── scripts/                         # cross-process bring-up, deploy, seed, CI gates
-└── pnpm-workspace.yaml
-```
-
-## Bring-up (local)
+## TL;DR
 
 ```bash
-# 1. Install
-pnpm install
-
-# 2. Bring up the chain + deploy contracts + seed
-cp .env.example .env             # then edit .env if needed
-set -a; source .env; set +a
-anvil --block-time 2 --accounts 10 --balance 100 \
-      --gas-price 0 --base-fee 0 \
-      --mnemonic "$ANVIL_MNEMONIC" &
-bash scripts/deploy.sh
-
-# 3. Run the apps (proxy on 3000 fronts platform on 3010 + issuer on 3001)
-pnpm dev
-
-# 4. (Optional) front the proxy with ngrok for wwWallet access
-ngrok http --domain=$(echo $PUBLIC_HOSTNAME | sed 's|https://||') 3000
-
-# 5. Demo flow — open the browser, hit /dev/personas, pick "Demo Client",
-#    book a consultation with Anna Schmidt, switch persona to Anna and
-#    accept, switch back to client and mark complete.
-#    Or run the headless smoke test:
-bash scripts/smoke-test.sh
+git clone <this repo>
+cd firmusnovus
+bash scripts/start.sh              # → http://localhost:3000
 ```
 
-## How to use this from Claude Code
+That builds a single Docker image, spins up anvil + the three Next.js apps, deploys the contracts, and seeds both SQLite DBs. About 5–8 minutes for the first build, ~30 s on subsequent runs.
 
-1. From inside this directory, start Claude Code.
-2. Read [the constitution](.specify/memory/constitution.md) — the
-   nine principles + seven invariants are the project's
-   non-negotiables.
-3. Read [the active spec](specs/001-verified-legal-engagement/spec.md)
-   for the user-facing requirements.
-4. Read [the plan](specs/001-verified-legal-engagement/plan.md) for
-   the tech stack, project structure, and constitution-check table.
-5. Read [the quickstart](specs/001-verified-legal-engagement/quickstart.md)
-   for the 10-minute bring-up flow.
+To wipe and start over:
 
-## Specification workflow used
+```bash
+bash scripts/reset.sh
+```
 
-This spec set was produced via the Spec Kit workflow:
+To expose the platform on a public URL via ngrok (so an EUDI wallet on a different device can reach it):
 
-1. `/speckit-specify` — captured the unified spec from four input
-   sets (a frontend, a backend, customer journeys, a prior merged
-   spec set). Five mismatches were resolved with the user before
-   writing.
-2. `/speckit-clarify` — asked five targeted questions on remaining
-   ambiguities (concurrency, chain availability, localization,
-   consultation timeout, GDPR scope) and integrated the answers as
-   FR-058..FR-061, FR-015a/b, FR-055a, plus an Out-of-Scope item.
-3. `/speckit-plan` — wrote the cross-feature plan, Phase 0 research
-   (14 decisions), and Phase 1 design artifacts (data model + four
-   interface contracts + quickstart). Updated CLAUDE.md.
-4. `/speckit-tasks` — generated 178 numbered tasks across 11 phases,
-   organized by user story for independent implementation.
+```bash
+bash scripts/start-ngrok.sh
+```
 
-## Constraints worth knowing before reading the spec
+---
 
-- **Single-wallet** SIWE + selective-disclosure VC for both clients
-  and lawyers.
-- **ETH-only** on chain AND in user-facing copy. (No fiat / EUR.)
-- **Two separate processes**: `apps/issuer/` (issues credentials) is
-  separate from `apps/platform/` (verifies, hosts the application).
-  Process boundary is enforced at the filesystem level (separate
-  signing keys, separate DBs).
-- **Asymmetric dispute mechanism**: client may dispute any funded /
-  delivered proposal immediately; lawyer may only escalate after a
-  30-day cooldown. Contract-enforced, not policy-enforced.
-- **End-to-end-encrypted messaging**: server holds ciphertext only;
-  no decryption code path exists in any server bundle.
-- **ngrok** is the dev hosting target — single hostname, path-routed
-  to issuer / platform.
-- **Trunk-only branching**: commits land on `main`. No feature
-  branches.
+## What's running
 
-## Project workflow
+The container exposes two ports on the host:
 
-- `main` is the only long-lived branch.
-- All changes land on `main` directly.
-- CI gates that run on every push (per [the constitution](.specify/memory/constitution.md)
-  Engineering Rules + Phase 2 task T077):
-  - `forge test` — Solidity invariants (asymmetric mechanism, escrow
-    flow, capability gates, sum-equality on resolve, cooldowns).
-  - `pnpm test` — vitest unit tests on crypto / credential paths.
-  - `pnpm madge --circular apps/platform/` — no import cycles
-    (Constitution Inv 7).
-  - `scripts/check-feature-isolation.sh` — sibling features never
-    import each other.
-  - `scripts/check-no-server-decryption.sh` — server bundles never
-    import the crypto/client/ helpers (Constitution Inv 1).
-  - `scripts/check-isolation.sh` — issuer + platform bring up
-    independently and the platform reaches the issuer only via
-    HTTPS JWKS (Constitution Inv 4).
-  - `scripts/check-brand-mentions.sh` — exactly one brand mention
-    in spec + plan title lines, zero elsewhere; zero references to
-    the alternative names from prior drafts.
+| Host port | What it is | Who talks to it |
+|---|---|---|
+| `:3000` | The proxy. Serves the platform UI at `/`, the issuer at `/issuer/*`, and the OID4VCI endpoints at `/api/issuer/*`. | Browsers, EUDI wallets. |
+| `:8545` | Anvil JSON-RPC. | MetaMask, Otterscan. |
+| `:5100` | [Otterscan](https://github.com/otterscan/otterscan) — Etherscan-shaped block explorer for the in-container anvil. Open `http://localhost:5100` to inspect every tx (funding, release, refund, dispute, resolve) with decoded calldata. | You, in a browser. |
 
-## Where things are not
+Inside the container:
 
-- There are no feature branches. The "Feature Branch:" header in
-  spec.md is a Spec Kit slot identifier (a directory name), not a
-  literal git branch.
+- **anvil** — local EVM (chain id `31337`, 10 funded accounts, 2 s blocks, no gas).
+- **proxy** (`tsx` on `:3000`) — single ingress, fronts the two Next.js apps.
+- **web** (`next start` on `:3010`) — the platform UI.
+- **issuer** (`next start` on `:3001`) — OID4VCI test issuer for PID + bar credentials.
 
-## License
+Container restart re-runs the entrypoint, which redeploys the contracts and reseeds both DBs from scratch. There is no persistent volume.
 
-(Add a license before publishing.)
+---
+
+## Prerequisites
+
+| | Why |
+|---|---|
+| **Docker** | Runs the whole stack. Tested with Docker 24+. |
+| **Google Chrome** (latest) | wwwallet's WebAuthn implementation only works reliably here. See *The wwwallet/passkey limitation* below. |
+| **MetaMask** in each Chrome profile | To sign SIWE messages and submit funding/release/dispute txs. |
+| **Up to 3 Google accounts** | One per persona (operator / lawyer / client). |
+| (optional) **ngrok CLI** | Only if you want a public URL. Run `ngrok config add-authtoken <yours>` once. |
+
+You do **not** need Node, pnpm, Foundry, or anything else on the host. They all live inside the image.
+
+---
+
+## The wwwallet / passkey limitation (read this first)
+
+The EUDI wallet we integrate with — [wwwallet](https://demo.wwwallet.org/) — uses passkeys (WebAuthn) for its master credential. In our hands, **the only reliable combination is**:
+
+- **Google Chrome** (Edge/Brave have worked occasionally, Safari/Firefox have not)
+- Each Chrome profile **signed in to its own Google account**, so passkey storage doesn't collide
+- One Chrome profile per persona — never two personas in the same profile
+
+To run all three personas on one machine:
+
+1. Chrome → profile menu (top-right circle) → **Add** → sign in to (or create) a fresh Google account.
+2. Repeat so you have one profile per persona.
+3. Install MetaMask in each profile separately.
+4. Open `https://demo.wwwallet.org` in each profile and complete first-run setup. The Google passkey is bound at this step.
+
+Skipping any of this will look like "the wallet button does nothing" or "no passkey appears". It's not the platform — it's wwwallet's auth model.
+
+---
+
+## Personas
+
+You'll demo with three roles. **Each role = one Chrome profile = one MetaMask account = one EUDI wallet**.
+
+| Role | Anvil account | Special handling |
+|---|---|---|
+| **Operator** | index `0` (matches `OPERATOR_PRIVATE_KEY` in `.env`) | The platform recognises this exact wallet at SIWE time and pins it to `OPERATOR`. Operator skips PID/bar onboarding entirely — they go straight to `/admin/dashboard`. |
+| **Lawyer** | indices `1–3` recommended (Anna, Carlos, Dieter — see `/issuer`) | Onboarded by presenting **PID + bar credential**, both minted from `/issuer`. Role lifts to LAWYER once the bar credential is attested on chain. |
+| **Client** | indices `4–6` recommended (Sofia, Eva, Marta) | Onboarded by presenting **PID only**. |
+
+The operator is special because the contract's `attestVerifiedClient` / `attestVerifiedLawyer` / `resolveDispute` calls are all gated on the operator address. Everyone else's role comes from on-chain attestations.
+
+You can use any anvil account for lawyer or client — the persona names listed above are just the test data baked into the issuer.
+
+---
+
+## Step-by-step setup (per persona)
+
+### 1. Get anvil's credentials
+
+```bash
+docker logs firmus-novus 2>&1 | grep -A 25 "Available Accounts"
+```
+
+You'll see ten address/private-key pairs. Pick one per persona. **Index 0 is always the operator** — its private key is also baked into `.env` as `OPERATOR_PRIVATE_KEY`, so you can use either.
+
+### 2. Add the chain to MetaMask
+
+In each Chrome profile's MetaMask:
+
+- Networks → **Add a network manually**
+- Network name: `Anvil (Firmus dev)`
+- RPC URL: `http://localhost:8545`
+- Chain ID: `31337`
+- Currency symbol: `ETH`
+
+### 3. Import the persona's account
+
+MetaMask → account picker → **Import account** → paste the private key from step 1.
+
+You should see ~100 ETH on the account. (Anvil's `--balance 100`.)
+
+### 4. Mint the credentials
+
+Navigate to the test issuer:
+
+- **Local run**: `http://localhost:3000/issuer`
+- **ngrok run**: the public URL printed by `start-ngrok.sh`, then `/issuer`
+
+You'll see a list of test personas (Anna Schmidt, Carlos García, …). Pick the persona matching your account index and click **Mint PID** (and **Mint Bar** if it's a lawyer). wwwallet opens; passkey prompts; approve.
+
+> ⚠ **Important**: the issuer's persona index must match the anvil account index. If you imported anvil account `1` to MetaMask, mint Anna Schmidt's credentials. Mismatch → on-chain attestation fires for the wrong wallet → onboarding will silently bind the credentials to a different MetaMask account.
+
+### 5. Onboard
+
+1. Open the platform — `http://localhost:3000` (or your ngrok URL).
+2. Click **Connect wallet**, pick your persona's MetaMask account, sign the SIWE message.
+3. The platform routes you to `/connect`:
+   - **Operator** → automatically redirected to `/admin/dashboard`. Done.
+   - **Client** → present PID only → land on `/client/home`.
+   - **Lawyer** → present PID, then bar credential → land on `/lawyer/dashboard`.
+4. The `/connect` flow opens wwwallet for each presentation. Approve with your passkey.
+
+### 6. Operator: enable secure messaging
+
+The operator decrypts dispute archives client-side. On `/admin/dashboard` you'll see an amber **"Decryption key not enrolled"** card — click **Enable** and sign once with the operator wallet. After that, every dispute view at `/admin/disputes/*` will decrypt automatically.
+
+---
+
+## Demo flows worth showing
+
+**Booking + escrow + release** (golden path)
+
+1. Client picks a lawyer at `/lawyers/[id]`, books a consultation.
+2. Lawyer accepts (`/lawyer/orders/[id]`).
+3. Client funds escrow (one MetaMask tx).
+4. Lawyer marks the consultation complete; client releases (one MetaMask tx).
+
+**Mutual refund**
+
+5. Either party can propose a refund from the same case page; the other co-signs; one MetaMask tx executes the refund.
+
+**Follow-up order**
+
+6. Lawyer creates a follow-up order from `/lawyer/follow-ups/new`; client funds; later releases.
+
+**Dispute resolution**
+
+7. Either party clicks **Open dispute**.
+8. Both parties click **Submit my archive to the arbiter** — their conversation is decrypted client-side and re-encrypted to the operator.
+9. Operator opens `/admin/disputes/[kind]/[id]`, reads both archives side-by-side, picks a split, signs the `resolveDispute` tx.
+
+---
+
+## Reset
+
+```bash
+bash scripts/reset.sh           # local
+bash scripts/reset.sh --ngrok   # bring it back up with the ngrok tunnel
+```
+
+Removes the container, restarts it. Anvil chain is wiped, contracts redeploy at fresh addresses, both DBs reseed. **Your MetaMask account stays the same** (same private key) but its on-chain attestations and balances reset. **You'll need to re-onboard each persona.**
+
+If you've added Firmus's anvil network to MetaMask and start running into "wrong nonce" or "transaction underpriced" errors after a reset — MetaMask caches per-wallet nonces. Settings → Advanced → **Clear activity tab data** clears them.
+
+---
+
+## ngrok run (public URL)
+
+```bash
+bash scripts/start-ngrok.sh
+```
+
+What this does:
+
+1. Starts a free ngrok tunnel pointing at `http://localhost:3000`, gets the public URL.
+2. Builds the Docker image.
+3. Runs the container with `PUBLIC_HOSTNAME=<ngrok URL>`. The issuer + verifier metadata served to the wallet now uses that URL, so wwwallet can reach the issuer's `.well-known` endpoints.
+
+Caveats:
+
+- **Anvil is NOT tunneled.** Only `:3000` goes through ngrok. MetaMask must point at `http://localhost:8545` on whichever machine is running the container. If a remote viewer wants to do real chain interaction, they'd need to run their own copy.
+- The ngrok free tier rotates URLs on every restart. If you reset, the URL changes; mints / onboarding sessions started before the restart will fail because the issuer URL no longer matches.
+
+---
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Wallet button does nothing in Chrome | Profile not signed in to a Google account, or two profiles share an account | Use a fresh Google account in each Chrome profile; close + reopen the profile |
+| `Could not connect to wallet` (MetaMask) | Wrong network selected | Switch MetaMask network to `Anvil (Firmus dev)` |
+| `Internal JSON-RPC error: nonce too high` | Reset wiped the chain but MetaMask cached nonces | MetaMask → Settings → Advanced → **Clear activity tab data** |
+| Onboarding finalize returns 500 | Stale JWT after a reset | Sign out (top-right menu) and sign back in |
+| `/connect` redirects in a loop | Operator wallet detected but role mismatch in JWT | Sign out, clear cookies for the host, sign back in |
+| Issuer mint button opens wwwallet but credential never lands | wwwallet can't reach the issuer's `.well-known` | Check `PUBLIC_HOSTNAME` in `docker logs firmus-novus`; for ngrok make sure the URL hasn't rotated |
+| Dispute archive panels empty for the operator | Operator messaging key not enrolled | `/admin/dashboard` → click **Enable** on the amber card |
+| `the lawyer hasn't enabled secure messaging yet` | Counterparty hasn't visited their `/messages` tab once | Have the counterparty open `/lawyer/messages` (or `/client/messages`) and sign once |
+| `host port 8545 already in use` | A previous anvil is still running on the host | `pkill -x anvil`, or set `PORT=3010 bash scripts/start.sh` and adjust MetaMask |
+| ngrok "tunnel not found" | Authtoken missing | `ngrok config add-authtoken <token>` once |
+
+Container logs are the single source of truth: `docker logs -f firmus-novus`.
+
+---
+
+## What's where
+
+```
+/                  marketing landing → /lawyers
+/lawyers           directory of verified lawyers
+/lawyers/[id]      lawyer profile
+/connect           onboarding flow (PID, optional bar credential)
+/client/...        client surface (cases, follow-ups, messages, engagements, consultation room)
+/lawyer/...        lawyer surface (dashboard, orders, follow-ups, profile editor, engagements, consultation room)
+/admin/...         operator surface (dashboard, dispute resolution) — gated to OPERATOR role
+/issuer            test OID4VCI issuer (mint PID + bar credentials)
+/api/...           platform API
+/api/issuer/...    OID4VCI endpoints (proxied to the issuer app)
+```
+
+---
+
+## Architecture (one paragraph)
+
+A pnpm workspace with three Next.js 15 apps (`apps/web`, `apps/issuer`, `apps/proxy`) plus shared packages (`packages/dcql`, `packages/sd-jwt`, `packages/oid4vci`, `packages/db-toolkit`, `packages/crypto`). Identity is rooted in the EUDI ecosystem (PID + bar credentials, OID4VCI for issuance, OID4VP for presentation) and bound to wallets via EAS attestations on a Solidity escrow contract (`contracts/`). Messaging is end-to-end via NaCl box X25519 keypairs derived from a wallet signature; dispute archives use the same primitive but re-encrypted to the operator. SSE keeps both parties' UIs in sync without polling. SQLite for everything app-side; SQLite for the issuer too (separate DB).

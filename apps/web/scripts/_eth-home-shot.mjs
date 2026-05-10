@@ -1,0 +1,13 @@
+import { chromium } from "@playwright/test";
+const SARAH = "0x2222000000000000000000000000000000000001";
+const browser = await chromium.launch({ headless: true });
+const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 });
+const page = await ctx.newPage();
+await page.goto(`http://localhost:3000/dev/sign-in?wallet=${SARAH}&role=client&redirect=/client/home?cat=Property`, { waitUntil: "domcontentloaded" });
+await page.waitForTimeout(2000);
+await page.screenshot({ path: "/tmp/eth-home-property.png", fullPage: true });
+await page.goto(`http://localhost:3000/client/home?cat=Family`, { waitUntil: "domcontentloaded" });
+await page.waitForTimeout(1500);
+await page.screenshot({ path: "/tmp/eth-home-family.png", fullPage: true });
+await browser.close();
+console.log("done");

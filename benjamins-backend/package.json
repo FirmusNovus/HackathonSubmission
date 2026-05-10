@@ -4,18 +4,17 @@
   "private": true,
   "scripts": {
     "anvil": "dotenv -e .env -- bash -c 'anvil --block-time 2 --accounts 10 --balance 100 --gas-price 0 --base-fee 0 ${ANVIL_MNEMONIC:+--mnemonic \"$ANVIL_MNEMONIC\"}'",
-    "dev": "dotenv -e .env -- concurrently -n proxy,platform,bar,pid -c blue,green,magenta,yellow \"pnpm -F @lex-nova/proxy dev\" \"pnpm -F @lex-nova/platform dev\" \"pnpm -F @lex-nova/bar-issuer dev\" \"pnpm -F @lex-nova/pid-issuer dev\"",
+    "dev": "dotenv -e .env -- concurrently -n proxy,platform,issuer -c blue,green,magenta \"pnpm -F @lex-nova/proxy dev\" \"pnpm -F @lex-nova/platform dev\" \"pnpm -F @lex-nova/issuer dev\"",
     "dev:platform": "dotenv -e .env -- pnpm -F @lex-nova/platform dev",
-    "dev:bar-issuer": "dotenv -e .env -- pnpm -F @lex-nova/bar-issuer dev",
-    "dev:pid-issuer": "dotenv -e .env -- pnpm -F @lex-nova/pid-issuer dev",
+    "dev:issuer": "dotenv -e .env -- pnpm -F @lex-nova/issuer dev",
     "dev:proxy": "dotenv -e .env -- pnpm -F @lex-nova/proxy dev",
     "build": "pnpm -r --if-present build",
     "test": "pnpm -r --if-present test",
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
     "scripts:deploy": "dotenv -e .env -- bash -c 'cd contracts && forge script script/Deploy.s.sol --rpc-url ${RPC_URL:-http://127.0.0.1:8545} --broadcast'",
-    "scripts:seed": "dotenv -e .env -- bash -c 'pnpm -F @lex-nova/bar-issuer seed && pnpm -F @lex-nova/pid-issuer seed'",
-    "scripts:reset": "rm -rf apps/platform/data apps/bar-issuer/data apps/pid-issuer/data apps/platform/lib/chain/deployed-addresses.json && pnpm scripts:deploy && pnpm scripts:seed",
+    "scripts:seed": "dotenv -e .env -- pnpm -F @lex-nova/issuer seed",
+    "scripts:reset": "rm -rf apps/platform/data apps/issuer/data apps/platform/lib/chain/deployed-addresses.json && pnpm scripts:deploy && pnpm scripts:seed",
     "scripts:check-attestations": "dotenv -e .env -- tsx scripts/check-attestations.ts"
   },
   "devDependencies": {

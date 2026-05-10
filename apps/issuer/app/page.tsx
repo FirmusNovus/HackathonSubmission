@@ -1,35 +1,66 @@
-// Owner spec: 001-verified-legal-engagement.
+import { getDb } from "@/lib/db";
+import { PersonaList } from "./persona-list";
 
-import { TestWarning } from './test-warning';
-import { CredentialPicker } from './credential-picker';
+export const dynamic = "force-dynamic";
 
-export const dynamic = 'force-dynamic';
+interface PidRow {
+  display_name: string;
+  eth_address: string;
+}
 
-export default function IssuerHome() {
+interface BarRow {
+  eth_address: string;
+}
+
+export default function HomePage() {
+  const db = getDb();
+  const pids = db
+    .prepare("SELECT display_name, eth_address FROM pid_subjects ORDER BY id")
+    .all() as PidRow[];
+  const lawyerSet = new Set(
+    (db.prepare("SELECT eth_address FROM bar_subjects").all() as BarRow[]).map((r) =>
+      r.eth_address.toLowerCase(),
+    ),
+  );
+  const personas = pids.map((p) => ({
+    name: p.display_name,
+    address: p.eth_address,
+    hasLawyer: lawyerSet.has(p.eth_address.toLowerCase()),
+  }));
+
   return (
-    <main style={{ maxWidth: 760, margin: '40px auto', padding: 24 }}>
-      <TestWarning />
+    <main style={{ maxWidth: 760, margin: "0 auto", padding: "32px 24px" }}>
       <div
+        role="alert"
         style={{
-          display: 'inline-block',
-          background: '#f5efd9',
-          color: '#9c7e3f',
-          padding: '4px 10px',
-          borderRadius: 999,
-          fontSize: 12,
-          fontWeight: 600,
+          background: "#fef3c7",
+          border: "1px solid #f59e0b",
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 28,
         }}
       >
-        For testing only
+        <div style={{ fontWeight: 700, fontSize: 14, color: "#92400e", marginBottom: 4 }}>
+          ⚠ Test issuer — credentials are not legally valid
+        </div>
+        <div style={{ fontSize: 13, color: "#78350f", lineHeight: 1.55 }}>
+          Click a Mint button to open your EUDI wallet and pick up a stand-in credential for the
+          chosen persona.
+        </div>
       </div>
-      <h1 style={{ marginTop: 12 }}>Test Credential Issuer</h1>
-      <p style={{ color: '#475569', maxWidth: 560 }}>
-        This service issues SD-JWT VCs over OID4VCI for development +
-        integration testing only. Pick which credential to mint, supply the
-        wallet address that should hold it, and hand the resulting offer URL
-        off to your wallet.
-      </p>
-      <CredentialPicker />
+
+      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 16 }}>Mint a test credential</h1>
+
+      <div
+        style={{
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          background: "white",
+          overflow: "hidden",
+        }}
+      >
+        <PersonaList personas={personas} />
+      </div>
     </main>
   );
 }

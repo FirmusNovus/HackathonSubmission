@@ -1,0 +1,37 @@
+# Build artefacts and per-machine state — the image will rebuild them.
+node_modules
+**/node_modules
+.pnpm-store
+.next
+**/.next
+**/dist
+
+# Local DB state. Both get re-created from migrations + seeds at container start.
+apps/web/prisma/dev.db
+apps/web/prisma/dev.db-journal
+apps/web/prisma/dev.db-shm
+apps/web/prisma/dev.db-wal
+apps/issuer/data/db.sqlite
+apps/issuer/data/db.sqlite-shm
+apps/issuer/data/db.sqlite-wal
+
+# Foundry caches — recompiled inside the image.
+contracts/cache
+contracts/out
+contracts/broadcast
+
+# Local chain artefacts the entrypoint regenerates.
+apps/web/lib/chain/deployed-addresses.json
+
+# Editor / OS noise.
+.git
+.github
+.vscode
+.idea
+.DS_Store
+*.log
+
+# Tests / playwright runtime files. Not needed at runtime.
+apps/web/playwright-report
+apps/web/test-results
+**/coverage

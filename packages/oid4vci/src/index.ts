@@ -1,17 +1,21 @@
 /**
  * OID4VCI flow primitives — pre-auth code state, token endpoint helpers,
- * holder-proof verification, and credential-offer state. Owner spec: 001.
+ * holder-proof verification, and credential-offer state.
  *
- * Decoupled from any specific app's DB connection: every function takes the
- * better-sqlite3 Database instance as its first argument, so the same
- * package can back both the PID and bar issuance paths within a single
- * Next.js process.
+ * Decoupled from any specific app's database connection: every function takes
+ * the SQLite Database instance as its first argument. This lets the same
+ * package be reused by independent issuer apps (bar, pid, …), each backing
+ * its own SQLite file.
  */
-import { randomBytes } from 'node:crypto';
-import { jwtVerify, importJWK, type JWK } from 'jose';
-import type Database from 'better-sqlite3';
+import { randomBytes } from "node:crypto";
+import { jwtVerify, type JWK, importJWK } from "jose";
+import type Database from "better-sqlite3";
 
-const ACCESS_TOKEN_TTL = 60 * 10; // 10 minutes
+const ACCESS_TOKEN_TTL = 60 * 10; // 10 min
+
+// ============================================================
+// Required schema (each issuer app applies these tables in its migrations)
+// ============================================================
 
 export const ISSUER_TABLES_SQL = `
 CREATE TABLE IF NOT EXISTS issuer_pre_auth_codes (
@@ -52,10 +56,10 @@ export interface NewPreAuthArgs {
 }
 
 export function mintPreAuthCode(db: Database.Database, args: NewPreAuthArgs): string {
-  const code = randomBytes(24).toString('base64url');
+  const code = randomBytes(24).toString("base64url");
   db.prepare(
     `INSERT INTO issuer_pre_auth_codes (code, kind, persona_id, tx_code, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?)`
   ).run(code, args.kind, args.personaId, args.txCode ?? null, Math.floor(Date.now() / 1000));
   return code;
 }
@@ -69,20 +73,16 @@ export interface PreAuthRow {
   consumed_at: number | null;
 }
 
-function consumePreAuthCode(
-  db: Database.Database,
-  code: string,
-  txCode?: string,
-): PreAuthRow | null {
+function consumePreAuthCode(db: Database.Database, code: string, txCode?: string): PreAuthRow | null {
   const row = db
     .prepare(`SELECT * FROM issuer_pre_auth_codes WHERE code = ?`)
     .get(code) as PreAuthRow | undefined;
   if (!row) return null;
   if (row.consumed_at) return null;
-  if (row.tx_code && row.tx_code !== (txCode ?? '')) return null;
+  if (row.tx_code && row.tx_code !== (txCode ?? "")) return null;
   db.prepare(`UPDATE issuer_pre_auth_codes SET consumed_at = ? WHERE code = ?`).run(
     Math.floor(Date.now() / 1000),
-    code,
+    code
   );
   return row;
 }
@@ -103,17 +103,17 @@ export interface AccessTokenIssue {
 export function issueAccessToken(
   db: Database.Database,
   preAuthCode: string,
-  txCode?: string,
+  txCode?: string
 ): AccessTokenIssue | null {
   const row = consumePreAuthCode(db, preAuthCode, txCode);
   if (!row) return null;
-  const access_token = randomBytes(32).toString('base64url');
-  const c_nonce = randomBytes(16).toString('base64url');
-  const dpop_nonce = randomBytes(16).toString('base64url');
+  const access_token = randomBytes(32).toString("base64url");
+  const c_nonce = randomBytes(16).toString("base64url");
+  const dpop_nonce = randomBytes(16).toString("base64url");
   const now = Math.floor(Date.now() / 1000);
   db.prepare(
     `INSERT INTO issuer_access_tokens (token, kind, persona_id, dpop_nonce, c_nonce, created_at, expires_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run(access_token, row.kind, row.persona_id, dpop_nonce, c_nonce, now, now + ACCESS_TOKEN_TTL);
   return {
     access_token,
@@ -147,12 +147,12 @@ export function readAccessToken(db: Database.Database, token: string): AccessTok
 export function markIssued(db: Database.Database, token: string): void {
   db.prepare(`UPDATE issuer_access_tokens SET issued_at = ? WHERE token = ?`).run(
     Math.floor(Date.now() / 1000),
-    token,
+    token
   );
 }
 
 // ============================================================
-// Credential offers (one offerId references one pre-auth code)
+// Credential offers
 // ============================================================
 
 export interface CreatedOffer {
@@ -163,12 +163,12 @@ export interface CreatedOffer {
 export function createOffer(
   db: Database.Database,
   kind: string,
-  personaId: number,
+  personaId: number
 ): CreatedOffer {
   const preAuthCode = mintPreAuthCode(db, { kind, personaId });
-  const offerId = randomBytes(8).toString('hex');
+  const offerId = randomBytes(8).toString("hex");
   db.prepare(
-    `INSERT INTO credential_offers (offer_id, pre_auth_code, created_at) VALUES (?, ?, ?)`,
+    `INSERT INTO credential_offers (offer_id, pre_auth_code, created_at) VALUES (?, ?, ?)`
   ).run(offerId, preAuthCode, Math.floor(Date.now() / 1000));
   return { offerId, preAuthCode };
 }
@@ -186,7 +186,7 @@ export function readOfferById(db: Database.Database, offerId: string): OfferReco
       `SELECT o.offer_id, o.pre_auth_code, c.kind, c.persona_id
        FROM credential_offers o
        JOIN issuer_pre_auth_codes c ON c.code = o.pre_auth_code
-       WHERE o.offer_id = ?`,
+       WHERE o.offer_id = ?`
     )
     .get(offerId) as OfferRecord | undefined;
   return row ?? null;
@@ -199,18 +199,17 @@ export function readOfferById(db: Database.Database, offerId: string): OfferReco
 export async function verifyHolderProofs(
   proofsJwt: string[],
   expectedNonce: string,
-  expectedAudience: string,
+  expectedAudience: string
 ): Promise<JWK[]> {
   const out: JWK[] = [];
   for (const jwt of proofsJwt) {
-    const [headerB64] = jwt.split('.');
-    if (!headerB64) throw new Error('proof JWT malformed');
+    const [headerB64] = jwt.split(".");
     const header = JSON.parse(b64UrlToText(headerB64)) as { jwk?: JWK; alg?: string };
-    if (!header.jwk) throw new Error('proof JWT header missing jwk');
-    const key = await importJWK(header.jwk, header.alg ?? 'ES256');
+    if (!header.jwk) throw new Error("proof JWT header missing jwk");
+    const key = await importJWK(header.jwk, header.alg ?? "ES256");
     const { payload } = await jwtVerify(jwt, key, { audience: expectedAudience });
     if ((payload as { nonce?: string }).nonce !== expectedNonce) {
-      throw new Error('proof nonce mismatch');
+      throw new Error("proof nonce mismatch");
     }
     out.push(header.jwk);
   }
@@ -218,10 +217,7 @@ export async function verifyHolderProofs(
 }
 
 function b64UrlToText(b64: string): string {
-  const padded = b64
-    .padEnd(Math.ceil(b64.length / 4) * 4, '=')
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
+  const padded = b64.padEnd(Math.ceil(b64.length / 4) * 4, "=").replace(/-/g, "+").replace(/_/g, "/");
   const bin = atob(padded);
   return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
 }

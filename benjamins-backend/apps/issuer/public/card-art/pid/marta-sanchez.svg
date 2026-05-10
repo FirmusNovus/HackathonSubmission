@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250">
+  <rect width="100%" height="100%" fill="#0c4a6e"/>
+  <rect x="0" y="0" width="400" height="40" fill="rgba(255,255,255,0.08)"/>
+  <text x="20" y="28" fill="white" font-family="sans-serif" font-size="14" font-weight="600">EUDI PID</text>
+  <text x="20" y="100" fill="white" font-family="sans-serif" font-size="22" font-weight="700">Marta Sánchez</text>
+  <text x="20" y="128" fill="rgba(255,255,255,0.85)" font-family="sans-serif" font-size="14">EU resident · ES</text>
+  <text x="20" y="220" fill="rgba(255,255,255,0.6)" font-family="ui-monospace, monospace" font-size="10">0xE01fa8C3C47c12108a956D7DB866B49eE724A611</text>
+</svg>

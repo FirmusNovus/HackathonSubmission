@@ -1,28 +1,29 @@
 /**
- * Seeds the issuer's `subjects` roster with the six pre-staged personas:
- *   - five lawyers (anvil indices 1-5) with PID + bar entries
- *   - one client (anvil index 6) with a PID entry only
+ * Combined issuer seed. Populates both `pid_subjects` (EU PID) and
+ * `bar_subjects` (legal-professional accreditation) tables, plus generates the
+ * two signing keys (`data/pid-signing-key.jwk`, `data/bar-signing-key.jwk`).
  *
- * Idempotent. Also generates pid-signing-key.jwk + bar-signing-key.jwk on
- * first run if they're missing.
- *
- *   pnpm -F @firmus-novus/issuer seed
+ * Idempotent. Run from the monorepo root:
+ *   pnpm --filter @firmus/issuer seed
  */
-import { existsSync, mkdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import Database from 'better-sqlite3';
-import { mnemonicToAccount } from 'viem/accounts';
-import type { Address } from 'viem';
-import { runSchema } from '../lib/db/schema';
-import { ensureKey } from '../lib/keys';
+import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 
-const APP_ROOT = resolve(__dirname, '..');
-const DATA_DIR = join(APP_ROOT, 'data');
-const DB_PATH = process.env.ISSUER_DB ?? join(DATA_DIR, 'db.sqlite');
+import Database from "better-sqlite3";
+import { generateKeyPair, exportJWK } from "jose";
+import { type Address } from "viem";
+import { mnemonicToAccount } from "viem/accounts";
+import { createDb } from "@firmus/db-toolkit";
+
+const APP_ROOT = join(__dirname, "..");
+const DATA_DIR = join(APP_ROOT, "data");
+const DB_PATH = process.env.ISSUER_DB_PATH ?? join(DATA_DIR, "db.sqlite");
+const PID_KEY_PATH = process.env.PID_ISSUER_KEY_PATH ?? join(DATA_DIR, "pid-signing-key.jwk");
+const BAR_KEY_PATH = process.env.BAR_ISSUER_KEY_PATH ?? join(DATA_DIR, "bar-signing-key.jwk");
+const MIGRATIONS_DIR = join(APP_ROOT, "lib/db/migrations");
 
 const ANVIL_MNEMONIC =
-  process.env.ANVIL_MNEMONIC ??
-  'test test test test test test test test test test test junk';
+  process.env.ANVIL_MNEMONIC ?? "test test test test test test test test test test test junk";
 
 interface PidSpec {
   index: number;
@@ -61,341 +62,345 @@ interface BarSpec {
   jurisdiction: string;
   bar_admission_date: string;
   bar_admission_number: string;
-  valid_until: string;
 }
 
 const PID_SUBJECTS: PidSpec[] = [
   {
     index: 1,
-    display_name: 'Anna Schmidt',
-    given_name: 'Anna',
-    family_name: 'Schmidt',
-    birth_given_name: 'Anna',
-    birth_family_name: 'Schmidt',
-    birthdate: '1985-04-12',
+    display_name: "Anna Schmidt",
+    given_name: "Anna",
+    family_name: "Schmidt",
+    birth_given_name: "Anna",
+    birth_family_name: "Schmidt",
+    birthdate: "1985-04-12",
     sex: 2,
-    email: 'anna.schmidt@kanzlei-schmidt.de',
-    phone_number: '+498912345678',
-    nationalities: ['DE'],
-    place_of_birth: { locality: 'M\u00fcnchen', region: 'Bayern', country: 'DE' },
+    email: "anna.schmidt@kanzlei-schmidt.de",
+    phone_number: "+498912345678",
+    nationalities: ["DE"],
+    place_of_birth: { locality: "München", region: "Bayern", country: "DE" },
     address: {
-      street_address: 'Maximilianstra\u00dfe',
-      house_number: '12',
-      postal_code: '80539',
-      locality: 'M\u00fcnchen',
-      region: 'Bayern',
-      country: 'DE',
-      formatted: 'Maximilianstra\u00dfe 12, 80539 M\u00fcnchen, Bayern, DE',
+      street_address: "Maximilianstraße",
+      house_number: "12",
+      postal_code: "80539",
+      locality: "München",
+      region: "Bayern",
+      country: "DE",
+      formatted: "Maximilianstraße 12, 80539 München, Bayern, DE",
     },
-    personal_administrative_number: 'DE-A-19850412-0001',
-    document_number: 'DE-PID-2023-887421',
-    issuing_authority: 'Bundesdruckerei',
-    issuing_country: 'DE',
-    issuing_jurisdiction: 'DE-BY',
+    personal_administrative_number: "DE-A-19850412-0001",
+    document_number: "DE-PID-2023-887421",
+    issuing_authority: "Bundesdruckerei",
+    issuing_country: "DE",
+    issuing_jurisdiction: "DE-BY",
   },
   {
     index: 2,
-    display_name: 'Carlos Garc\u00eda',
-    given_name: 'Carlos',
-    family_name: 'Garc\u00eda',
-    birth_given_name: 'Carlos',
-    birth_family_name: 'Garc\u00eda',
-    birthdate: '1981-07-08',
+    display_name: "Carlos García",
+    given_name: "Carlos",
+    family_name: "García",
+    birth_given_name: "Carlos",
+    birth_family_name: "García",
+    birthdate: "1981-07-08",
     sex: 1,
-    email: 'carlos.garcia@garcia-abogados.es',
-    phone_number: '+34915557788',
-    nationalities: ['ES'],
-    place_of_birth: { locality: 'Madrid', region: 'Comunidad de Madrid', country: 'ES' },
+    email: "carlos.garcia@garcia-abogados.es",
+    phone_number: "+34915557788",
+    nationalities: ["ES"],
+    place_of_birth: { locality: "Madrid", region: "Comunidad de Madrid", country: "ES" },
     address: {
-      street_address: 'Calle de Serrano',
-      house_number: '47',
-      postal_code: '28001',
-      locality: 'Madrid',
-      region: 'Comunidad de Madrid',
-      country: 'ES',
-      formatted: 'Calle de Serrano 47, 28001 Madrid, Comunidad de Madrid, ES',
+      street_address: "Calle de Serrano",
+      house_number: "47",
+      postal_code: "28001",
+      locality: "Madrid",
+      region: "Comunidad de Madrid",
+      country: "ES",
+      formatted: "Calle de Serrano 47, 28001 Madrid, Comunidad de Madrid, ES",
     },
-    personal_administrative_number: 'ES-A-19810708-0073',
-    document_number: 'ES-PID-2022-115502',
-    issuing_authority: 'Ministerio del Interior',
-    issuing_country: 'ES',
-    issuing_jurisdiction: 'ES-MD',
+    personal_administrative_number: "ES-A-19810708-0073",
+    document_number: "ES-PID-2022-115502",
+    issuing_authority: "Ministerio del Interior",
+    issuing_country: "ES",
+    issuing_jurisdiction: "ES-MD",
   },
   {
     index: 3,
-    display_name: 'Dieter M\u00fcller',
-    given_name: 'Dieter',
-    family_name: 'M\u00fcller',
-    birth_given_name: 'Dieter',
-    birth_family_name: 'M\u00fcller',
-    birthdate: '1976-11-23',
+    display_name: "Dieter Müller",
+    given_name: "Dieter",
+    family_name: "Müller",
+    birth_given_name: "Dieter",
+    birth_family_name: "Müller",
+    birthdate: "1976-11-23",
     sex: 1,
-    email: 'dieter.mueller@gdpr-mueller.de',
-    phone_number: '+493012345001',
-    nationalities: ['DE'],
-    place_of_birth: { locality: 'Berlin', region: 'Berlin', country: 'DE' },
+    email: "dieter.mueller@gdpr-mueller.de",
+    phone_number: "+493012345001",
+    nationalities: ["DE"],
+    place_of_birth: { locality: "Berlin", region: "Berlin", country: "DE" },
     address: {
-      street_address: 'Unter den Linden',
-      house_number: '44',
-      postal_code: '10117',
-      locality: 'Berlin',
-      region: 'Berlin',
-      country: 'DE',
-      formatted: 'Unter den Linden 44, 10117 Berlin, Berlin, DE',
+      street_address: "Unter den Linden",
+      house_number: "44",
+      postal_code: "10117",
+      locality: "Berlin",
+      region: "Berlin",
+      country: "DE",
+      formatted: "Unter den Linden 44, 10117 Berlin, Berlin, DE",
     },
-    personal_administrative_number: 'DE-B-19761123-0042',
-    document_number: 'DE-PID-2022-441208',
-    issuing_authority: 'Bundesdruckerei',
-    issuing_country: 'DE',
-    issuing_jurisdiction: 'DE-BE',
+    personal_administrative_number: "DE-B-19761123-0042",
+    document_number: "DE-PID-2022-441208",
+    issuing_authority: "Bundesdruckerei",
+    issuing_country: "DE",
+    issuing_jurisdiction: "DE-BE",
   },
   {
     index: 4,
-    display_name: 'Sofia Rossi',
-    given_name: 'Sofia',
-    family_name: 'Rossi',
-    birth_given_name: 'Sofia',
-    birth_family_name: 'Rossi',
-    birthdate: '1988-02-14',
+    display_name: "Sofia Rossi",
+    given_name: "Sofia",
+    family_name: "Rossi",
+    birth_given_name: "Sofia",
+    birth_family_name: "Rossi",
+    birthdate: "1988-02-14",
     sex: 2,
-    email: 'sofia.rossi@studiolegale-rossi.it',
-    phone_number: '+390652207788',
-    nationalities: ['IT'],
-    place_of_birth: { locality: 'Roma', region: 'Lazio', country: 'IT' },
+    email: "sofia.rossi@studiolegale-rossi.it",
+    phone_number: "+390652207788",
+    nationalities: ["IT"],
+    place_of_birth: { locality: "Roma", region: "Lazio", country: "IT" },
     address: {
-      street_address: 'Via del Corso',
-      house_number: '112',
-      postal_code: '00186',
-      locality: 'Roma',
-      region: 'Lazio',
-      country: 'IT',
-      formatted: 'Via del Corso 112, 00186 Roma, Lazio, IT',
+      street_address: "Via del Corso",
+      house_number: "112",
+      postal_code: "00186",
+      locality: "Roma",
+      region: "Lazio",
+      country: "IT",
+      formatted: "Via del Corso 112, 00186 Roma, Lazio, IT",
     },
-    personal_administrative_number: 'IT-A-19880214-0089',
-    document_number: 'IT-CIE-2023-RM-554210',
-    issuing_authority: 'Ministero dell\u2019Interno',
-    issuing_country: 'IT',
-    issuing_jurisdiction: 'IT-RM',
+    personal_administrative_number: "IT-A-19880214-0089",
+    document_number: "IT-CIE-2023-RM-554210",
+    issuing_authority: "Ministero dell'Interno",
+    issuing_country: "IT",
+    issuing_jurisdiction: "IT-RM",
   },
   {
     index: 5,
-    display_name: 'Eva Nov\u00e1k',
-    given_name: 'Eva',
-    family_name: 'Nov\u00e1k',
-    birth_given_name: 'Eva',
-    birth_family_name: 'Nov\u00e1k',
-    birthdate: '1983-09-30',
+    display_name: "Eva Novák",
+    given_name: "Eva",
+    family_name: "Novák",
+    birth_given_name: "Eva",
+    birth_family_name: "Novák",
+    birthdate: "1983-09-30",
     sex: 2,
-    email: 'eva.novak@novak-pravo.cz',
-    phone_number: '+420224567890',
-    nationalities: ['CZ'],
-    place_of_birth: { locality: 'Praha', region: 'Hlavn\u00ed m\u011bsto Praha', country: 'CZ' },
+    email: "eva.novak@novak-pravo.cz",
+    phone_number: "+420224567890",
+    nationalities: ["CZ"],
+    place_of_birth: { locality: "Praha", region: "Hlavní město Praha", country: "CZ" },
     address: {
-      street_address: 'N\u00e1rodn\u00ed t\u0159\u00edda',
-      house_number: '26',
-      postal_code: '11000',
-      locality: 'Praha 1',
-      region: 'Hlavn\u00ed m\u011bsto Praha',
-      country: 'CZ',
-      formatted: 'N\u00e1rodn\u00ed t\u0159\u00edda 26, 11000 Praha 1, Hlavn\u00ed m\u011bsto Praha, CZ',
+      street_address: "Národní třída",
+      house_number: "26",
+      postal_code: "11000",
+      locality: "Praha 1",
+      region: "Hlavní město Praha",
+      country: "CZ",
+      formatted: "Národní třída 26, 11000 Praha 1, Hlavní město Praha, CZ",
     },
-    personal_administrative_number: 'CZ-A-19830930-0017',
-    document_number: 'CZ-OP-2024-PR-883104',
-    issuing_authority: 'Ministerstvo vnitra',
-    issuing_country: 'CZ',
-    issuing_jurisdiction: 'CZ-PR',
+    personal_administrative_number: "CZ-A-19830930-0017",
+    document_number: "CZ-OP-2024-PR-883104",
+    issuing_authority: "Ministerstvo vnitra",
+    issuing_country: "CZ",
+    issuing_jurisdiction: "CZ-PR",
   },
   {
     index: 6,
-    display_name: 'Marta S\u00e1nchez',
-    given_name: 'Marta',
-    family_name: 'S\u00e1nchez',
-    birth_given_name: 'Marta',
-    birth_family_name: 'S\u00e1nchez',
-    birthdate: '1991-04-22',
+    display_name: "Marta Sánchez",
+    given_name: "Marta",
+    family_name: "Sánchez",
+    birth_given_name: "Marta",
+    birth_family_name: "Sánchez",
+    birthdate: "1991-04-22",
     sex: 2,
-    email: 'marta.sanchez@founderstartup.es',
-    phone_number: '+34910123456',
-    nationalities: ['ES'],
-    place_of_birth: { locality: 'Barcelona', region: 'Catalunya', country: 'ES' },
+    email: "marta.sanchez@founderstartup.es",
+    phone_number: "+34910123456",
+    nationalities: ["ES"],
+    place_of_birth: { locality: "Barcelona", region: "Catalunya", country: "ES" },
     address: {
-      street_address: 'Carrer de Bail\u00e8n',
-      house_number: '5',
-      postal_code: '08010',
-      locality: 'Barcelona',
-      region: 'Catalunya',
-      country: 'ES',
-      formatted: 'Carrer de Bail\u00e8n 5, 08010 Barcelona, Catalunya, ES',
+      street_address: "Carrer de Bailèn",
+      house_number: "5",
+      postal_code: "08010",
+      locality: "Barcelona",
+      region: "Catalunya",
+      country: "ES",
+      formatted: "Carrer de Bailèn 5, 08010 Barcelona, Catalunya, ES",
     },
-    personal_administrative_number: 'ES-A-19910422-0042',
-    document_number: 'ES-PID-2023-887422',
-    issuing_authority: 'Ministerio del Interior',
-    issuing_country: 'ES',
-    issuing_jurisdiction: 'ES-CT',
+    personal_administrative_number: "ES-A-19910422-0042",
+    document_number: "ES-PID-2023-887421",
+    issuing_authority: "Ministerio del Interior",
+    issuing_country: "ES",
+    issuing_jurisdiction: "ES-CT",
   },
 ];
 
 const BAR_SUBJECTS: BarSpec[] = [
   {
     index: 1,
-    display_name: 'Anna Schmidt',
-    given_name: 'Anna',
-    family_name: 'Schmidt',
-    jurisdiction: 'DE',
-    bar_admission_date: '2018-09-15',
-    bar_admission_number: 'RAK-Muenchen-2018-04321',
-    valid_until: '2030-09-15',
+    display_name: "Anna Schmidt",
+    given_name: "Anna",
+    family_name: "Schmidt",
+    jurisdiction: "DE",
+    bar_admission_date: "2018-09-15",
+    bar_admission_number: "RAK-Muenchen-2018-04321",
   },
   {
     index: 2,
-    display_name: 'Carlos Garc\u00eda',
-    given_name: 'Carlos',
-    family_name: 'Garc\u00eda',
-    jurisdiction: 'ES',
-    bar_admission_date: '2014-03-20',
-    bar_admission_number: 'ICAM-2014-08327',
-    valid_until: '2030-03-20',
+    display_name: "Carlos García",
+    given_name: "Carlos",
+    family_name: "García",
+    jurisdiction: "ES",
+    bar_admission_date: "2014-03-20",
+    bar_admission_number: "ICAM-2014-08327",
   },
   {
     index: 3,
-    display_name: 'Dieter M\u00fcller',
-    given_name: 'Dieter',
-    family_name: 'M\u00fcller',
-    jurisdiction: 'DE',
-    bar_admission_date: '2010-11-08',
-    bar_admission_number: 'RAK-Berlin-2010-01987',
-    valid_until: '2030-11-08',
+    display_name: "Dieter Müller",
+    given_name: "Dieter",
+    family_name: "Müller",
+    jurisdiction: "DE",
+    bar_admission_date: "2010-11-08",
+    bar_admission_number: "RAK-Berlin-2010-01987",
   },
   {
     index: 4,
-    display_name: 'Sofia Rossi',
-    given_name: 'Sofia',
-    family_name: 'Rossi',
-    jurisdiction: 'IT',
-    bar_admission_date: '2016-06-22',
-    bar_admission_number: 'Iscrizione N. A47912 \u2014 Albo Roma',
-    valid_until: '2030-06-22',
+    display_name: "Sofia Rossi",
+    given_name: "Sofia",
+    family_name: "Rossi",
+    jurisdiction: "IT",
+    bar_admission_date: "2016-06-22",
+    bar_admission_number: "Iscrizione N. A47912 — Albo Roma",
   },
   {
     index: 5,
-    display_name: 'Eva Nov\u00e1k',
-    given_name: 'Eva',
-    family_name: 'Nov\u00e1k',
-    jurisdiction: 'CZ',
-    bar_admission_date: '2012-04-01',
-    bar_admission_number: '\u010cAK ev. \u010d. 14302',
-    valid_until: '2030-04-01',
+    display_name: "Eva Novák",
+    given_name: "Eva",
+    family_name: "Novák",
+    jurisdiction: "CZ",
+    bar_admission_date: "2012-04-01",
+    bar_admission_number: "ČAK ev. č. 14302",
   },
 ];
 
-function addrAt(index: number): Address {
-  return mnemonicToAccount(ANVIL_MNEMONIC, { addressIndex: index }).address;
-}
-
 async function main() {
   if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-  const db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-  runSchema(db);
 
-  await ensureKey('pid');
-  await ensureKey('bar');
+  const db = createDb({ path: DB_PATH, migrationsDir: MIGRATIONS_DIR });
 
-  const upsertPid = db.prepare(`
-    INSERT INTO subjects (
-      eth_address, credential_type, display_name, given_name, family_name,
-      birth_given_name, birth_family_name, birthdate, sex, email, phone_number,
-      nationalities, place_of_birth, address_json,
-      personal_administrative_number, document_number, issuing_authority,
-      issuing_country, issuing_jurisdiction
-    ) VALUES (
-      @eth_address, 'pid', @display_name, @given_name, @family_name,
-      @birth_given_name, @birth_family_name, @birthdate, @sex, @email, @phone_number,
-      @nationalities, @place_of_birth, @address_json,
-      @personal_administrative_number, @document_number, @issuing_authority,
-      @issuing_country, @issuing_jurisdiction
-    )
-    ON CONFLICT(eth_address, credential_type) DO UPDATE SET
-      display_name = excluded.display_name,
-      given_name = excluded.given_name,
-      family_name = excluded.family_name,
-      birth_given_name = excluded.birth_given_name,
-      birth_family_name = excluded.birth_family_name,
-      birthdate = excluded.birthdate,
-      sex = excluded.sex,
-      email = excluded.email,
-      phone_number = excluded.phone_number,
-      nationalities = excluded.nationalities,
-      place_of_birth = excluded.place_of_birth,
-      address_json = excluded.address_json,
-      personal_administrative_number = excluded.personal_administrative_number,
-      document_number = excluded.document_number,
-      issuing_authority = excluded.issuing_authority,
-      issuing_country = excluded.issuing_country,
-      issuing_jurisdiction = excluded.issuing_jurisdiction
-  `);
+  await ensureKey(PID_KEY_PATH, "pid-issuer-key-1");
+  await ensureKey(BAR_KEY_PATH, "bar-issuer-key-1");
 
-  const upsertBar = db.prepare(`
-    INSERT INTO subjects (
-      eth_address, credential_type, display_name, given_name, family_name,
-      jurisdiction, bar_admission_date, bar_admission_number, valid_until
-    ) VALUES (
-      @eth_address, 'bar', @display_name, @given_name, @family_name,
-      @jurisdiction, @bar_admission_date, @bar_admission_number, @valid_until
-    )
-    ON CONFLICT(eth_address, credential_type) DO UPDATE SET
-      display_name = excluded.display_name,
-      given_name = excluded.given_name,
-      family_name = excluded.family_name,
-      jurisdiction = excluded.jurisdiction,
-      bar_admission_date = excluded.bar_admission_date,
-      bar_admission_number = excluded.bar_admission_number,
-      valid_until = excluded.valid_until
-  `);
+  const pidWithAddr = PID_SUBJECTS.map((s) => ({
+    ...s,
+    eth_address: mnemonicToAccount(ANVIL_MNEMONIC, { addressIndex: s.index }).address,
+  }));
+  const barWithAddr = BAR_SUBJECTS.map((s) => ({
+    ...s,
+    eth_address: mnemonicToAccount(ANVIL_MNEMONIC, { addressIndex: s.index }).address,
+  }));
 
-  for (const s of PID_SUBJECTS) {
-    upsertPid.run({
-      eth_address: addrAt(s.index).toLowerCase(),
-      display_name: s.display_name,
-      given_name: s.given_name,
-      family_name: s.family_name,
-      birth_given_name: s.birth_given_name,
-      birth_family_name: s.birth_family_name,
-      birthdate: s.birthdate,
-      sex: s.sex,
-      email: s.email,
-      phone_number: s.phone_number,
-      nationalities: JSON.stringify(s.nationalities),
-      place_of_birth: JSON.stringify(s.place_of_birth),
-      address_json: JSON.stringify(s.address),
-      personal_administrative_number: s.personal_administrative_number,
-      document_number: s.document_number,
-      issuing_authority: s.issuing_authority,
-      issuing_country: s.issuing_country,
-      issuing_jurisdiction: s.issuing_jurisdiction,
-    });
-    console.log(`  ✓ pid: ${s.display_name} (${addrAt(s.index)})`);
-  }
+  upsertPid(db, pidWithAddr);
+  upsertBar(db, barWithAddr);
 
-  for (const s of BAR_SUBJECTS) {
-    upsertBar.run({
-      eth_address: addrAt(s.index).toLowerCase(),
-      display_name: s.display_name,
-      given_name: s.given_name,
-      family_name: s.family_name,
-      jurisdiction: s.jurisdiction,
-      bar_admission_date: s.bar_admission_date,
-      bar_admission_number: s.bar_admission_number,
-      valid_until: s.valid_until,
-    });
-    console.log(`  ✓ bar: ${s.display_name} (${addrAt(s.index)})`);
-  }
-
-  console.log(`\nIssuer roster seeded at ${DB_PATH}`);
+  console.log(
+    `✓ issuer seeded — ${pidWithAddr.length} PID subjects, ${barWithAddr.length} BAR subjects (DB at ${DB_PATH})`,
+  );
 }
 
-main().catch((e) => {
-  console.error(e);
+function upsertPid(db: Database.Database, rows: Array<PidSpec & { eth_address: Address }>) {
+  const stmt = db.prepare(`
+    INSERT INTO pid_subjects (
+      id, display_name, eth_address, given_name, family_name, birth_given_name,
+      birth_family_name, birthdate, sex, email, phone_number, nationalities,
+      place_of_birth, address, personal_administrative_number, document_number,
+      issuing_authority, issuing_country, issuing_jurisdiction
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      display_name=excluded.display_name,
+      eth_address=excluded.eth_address,
+      given_name=excluded.given_name,
+      family_name=excluded.family_name,
+      birth_given_name=excluded.birth_given_name,
+      birth_family_name=excluded.birth_family_name,
+      birthdate=excluded.birthdate,
+      sex=excluded.sex,
+      email=excluded.email,
+      phone_number=excluded.phone_number,
+      nationalities=excluded.nationalities,
+      place_of_birth=excluded.place_of_birth,
+      address=excluded.address,
+      personal_administrative_number=excluded.personal_administrative_number,
+      document_number=excluded.document_number,
+      issuing_authority=excluded.issuing_authority,
+      issuing_country=excluded.issuing_country,
+      issuing_jurisdiction=excluded.issuing_jurisdiction
+  `);
+  for (const s of rows) {
+    stmt.run(
+      s.index,
+      s.display_name,
+      s.eth_address,
+      s.given_name,
+      s.family_name,
+      s.birth_given_name,
+      s.birth_family_name,
+      s.birthdate,
+      s.sex,
+      s.email,
+      s.phone_number,
+      JSON.stringify(s.nationalities),
+      JSON.stringify(s.place_of_birth),
+      JSON.stringify(s.address),
+      s.personal_administrative_number,
+      s.document_number,
+      s.issuing_authority,
+      s.issuing_country,
+      s.issuing_jurisdiction,
+    );
+  }
+}
+
+function upsertBar(db: Database.Database, rows: Array<BarSpec & { eth_address: Address }>) {
+  const stmt = db.prepare(`
+    INSERT INTO bar_subjects (id, display_name, eth_address, given_name, family_name,
+                              jurisdiction, bar_admission_date, bar_admission_number)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      display_name=excluded.display_name,
+      eth_address=excluded.eth_address,
+      given_name=excluded.given_name,
+      family_name=excluded.family_name,
+      jurisdiction=excluded.jurisdiction,
+      bar_admission_date=excluded.bar_admission_date,
+      bar_admission_number=excluded.bar_admission_number
+  `);
+  for (const s of rows) {
+    stmt.run(
+      s.index,
+      s.display_name,
+      s.eth_address,
+      s.given_name,
+      s.family_name,
+      s.jurisdiction,
+      s.bar_admission_date,
+      s.bar_admission_number,
+    );
+  }
+}
+
+async function ensureKey(path: string, kid: string) {
+  if (existsSync(path)) return;
+  const { privateKey } = await generateKeyPair("ES256", { extractable: true });
+  const jwk = await exportJWK(privateKey);
+  jwk.kid = kid;
+  jwk.alg = "ES256";
+  jwk.use = "sig";
+  writeFileSync(path, JSON.stringify(jwk, null, 2));
+  console.log(`✓ Generated signing key at ${path} (kid=${kid})`);
+}
+
+main().catch((err) => {
+  console.error(err);
   process.exit(1);
 });

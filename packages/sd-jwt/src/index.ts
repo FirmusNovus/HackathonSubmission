@@ -1,3 +1,2 @@
-export * from './issue';
-export * from './parse';
-export { verifySdJwtVc } from './parse';
+export * from "./parse";
+export * from "./issue";
