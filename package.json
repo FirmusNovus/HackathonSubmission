@@ -2,6 +2,7 @@
   "name": "firmusnovus-monorepo",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "packageManager": "pnpm@10.28.2",
   "scripts": {
     "dev": "dotenv -e .env -- concurrently -n proxy,web,issuer -c green,blue,magenta \"pnpm --filter @firmus/proxy dev\" \"pnpm --filter @firmus/web dev\" \"pnpm --filter @firmus/issuer dev\"",
